@@ -171,7 +171,7 @@ src/claude_usage_monitor/
 
 ## Privacy
 
-- No data leaves your machine except the HTTP requests to `claude.ai` (which your browser already makes).
+- No data leaves your machine except the HTTPS requests to `claude.ai` (which your browser already makes).
 - No cookies or tokens are stored to disk by this tool; they are read fresh from Firefox before every poll.
 - No telemetry.
 
