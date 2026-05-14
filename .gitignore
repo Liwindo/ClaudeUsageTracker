@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Config (contains no secrets, but personal — user may want to exclude)
+# Uncomment the next line to ignore your local config:
+# AppData/
+
+# PyInstaller (spec is kept in the repo, build artefacts are not)
+*.spec.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
