@@ -28,20 +28,19 @@ echo   Dependencies OK.
 echo.
 
 :: ── Step 2: Ensure PyInstaller is available ───────────────────────────────────
-uv run pyinstaller --version >nul 2>&1
-if errorlevel 1 (
+if not exist ".venv\Scripts\pyinstaller.exe" (
     echo [2/3] Installing PyInstaller ^(one-time^)...
-    uv pip install pyinstaller
+    uv pip install --python .venv\Scripts\python.exe pyinstaller
     if errorlevel 1 (
         echo.
         echo   ERROR: PyInstaller installation failed.
-        echo   Try manually: uv pip install pyinstaller
+        echo   Try manually: uv pip install --python .venv\Scripts\python.exe pyinstaller
         echo.
         pause & exit /b 1
     )
     echo   PyInstaller installed successfully.
 ) else (
-    for /f "tokens=*" %%v in ('uv run pyinstaller --version 2^>nul') do echo [2/3] PyInstaller %%v - OK.
+    for /f "tokens=*" %%v in ('.venv\Scripts\pyinstaller.exe --version 2^>nul') do echo [2/3] PyInstaller %%v - OK.
 )
 echo.
 
@@ -54,7 +53,7 @@ if exist dist\ClaudeUsageMonitor.exe (
 echo [3/3] Building EXE...
 echo   ^(First build ~30s  ^|  Rebuild with cache ~10s^)
 echo.
-uv run pyinstaller ClaudeUsageMonitor.spec
+.venv\Scripts\pyinstaller.exe ClaudeUsageMonitor.spec
 set BUILD_ERR=%errorlevel%
 
 echo.
