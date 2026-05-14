@@ -4,6 +4,22 @@ A lightweight Windows system-tray tool that shows your [claude.ai](https://claud
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints that Anthropic has not publicly documented. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
+## Quick start
+
+**Option A — Download the EXE (no Python required)**
+
+1. Download `ClaudeUsageMonitor.exe` from the [latest release](../../releases/latest)
+2. Double-click it — it starts silently in the system tray
+
+**Option B — Build from source**
+
+1. Install [uv](https://docs.astral.sh/uv/) if you haven't already
+2. Clone the repo and run:
+   ```
+   build_exe.bat
+   ```
+   The script handles everything (dependencies, PyInstaller, build). The EXE ends up in `dist\ClaudeUsageMonitor.exe`.
+
 ## How it works
 
 The tool reads your existing Firefox session cookies directly from Firefox's local cookie database — **no passwords, no manual exports, no stored credentials**. It then polls `claude.ai`'s internal `/usage` endpoint every 30 seconds (configurable) and updates the tray icon and floating widget accordingly. Firefox does not need to be open while the tool is running.
@@ -11,35 +27,8 @@ The tool reads your existing Firefox session cookies directly from Firefox's loc
 ## Requirements
 
 - Windows 10/11
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - Firefox — must be logged in to claude.ai at least once to populate the cookie database
-
-## Installation
-
-```bash
-# Clone the repo, then:
-cd claude-usage-monitor
-uv sync
-```
-
-Or with pip:
-
-```bash
-pip install -e .
-```
-
-## Running
-
-```bash
-# From the project directory:
-uv run python -m claude_usage_monitor
-
-# Or use the included helper (requires uv sync first):
-start.bat
-```
-
-The app starts silently in the system tray. A floating widget appears in the top-right corner of your screen.
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/) *(only if building from source)*
 
 ## Tray icon
 
@@ -68,21 +57,6 @@ An always-on-top mini-panel shows:
 - Position and size are remembered between sessions
 
 Minimise via the **−** button; restore via the tray icon (left-click or **Show widget**).
-
-## Building a standalone EXE
-
-```bash
-# First build (~30 s):
-build_exe.bat
-
-# Subsequent rebuilds (~10 s, uses cached build/):
-build_exe.bat
-
-# Clean rebuild from scratch:
-build_exe_clean.bat
-```
-
-The EXE is written to `dist\ClaudeUsageMonitor.exe`.
 
 ## Configuration
 
@@ -117,20 +91,29 @@ If auto-detection fails (e.g. you use a non-default profile), set the path manua
 firefox_profile_path = "C:\\Users\\YourName\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\abc123.default-release"
 ```
 
-## Project structure
+## Running from source
 
+If you want to run without building an EXE:
+
+```bash
+uv sync
+start.bat
 ```
-src/claude_usage_monitor/
-├── __main__.py         Entry point
-├── app.py              Orchestration (threads, callbacks)
-├── config.py           TOML config, OS paths
-├── firefox_cookies.py  Read cookies.sqlite from Firefox
-├── client.py           httpx calls to claude.ai (⚠ reverse-engineered)
-├── models.py           UsageData / LimitInfo dataclasses
-├── poller.py           Background polling thread
-├── tray.py             pystray icon + colour logic
-├── widget.py           Persistent always-on-top tkinter widget
-└── notifications.py    Desktop notification throttling
+
+Or directly:
+
+```bash
+uv run python -m claude_usage_monitor
+```
+
+## Rebuilding the EXE
+
+```bash
+# Incremental rebuild (~10 s, uses cached build/):
+build_exe.bat
+
+# Clean rebuild from scratch (~30 s):
+build_exe_clean.bat
 ```
 
 ## Troubleshooting
@@ -154,6 +137,22 @@ Cloudflare is blocking the request. Usually the `cf_clearance` cookie is stale. 
 ### The usage numbers seem wrong
 
 The `/usage` endpoint uses Anthropic's internal bucket names (e.g. `seven_day_omelette`). The mapping to human-readable labels is best-effort and may be incorrect. Open an issue if you can confirm the correct mapping for your plan.
+
+## Project structure
+
+```
+src/claude_usage_monitor/
+├── __main__.py         Entry point
+├── app.py              Orchestration (threads, callbacks)
+├── config.py           TOML config, OS paths
+├── firefox_cookies.py  Read cookies.sqlite from Firefox
+├── client.py           httpx calls to claude.ai (⚠ reverse-engineered)
+├── models.py           UsageData / LimitInfo dataclasses
+├── poller.py           Background polling thread
+├── tray.py             pystray icon + colour logic
+├── widget.py           Persistent always-on-top tkinter widget
+└── notifications.py    Desktop notification throttling
+```
 
 ## Privacy
 
