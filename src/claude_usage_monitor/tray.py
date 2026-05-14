@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import threading
+import os
 from typing import Callable
 
 from PIL import Image, ImageDraw
 import pystray
 
+from .config import log_file_path
 from .models import UsageData
 
 _ICON_SIZE = 64
@@ -70,6 +71,8 @@ class TrayIcon:
             pystray.MenuItem("Show widget", self._open, default=True),
             pystray.MenuItem("Refresh now", self._refresh),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("View log file", self._view_log),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._quit),
         )
         icon = pystray.Icon(
@@ -89,6 +92,11 @@ class TrayIcon:
 
     def _quit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_quit()
+
+    def _view_log(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        p = log_file_path()
+        if p.exists():
+            os.startfile(str(p))
 
     def run(self) -> None:
         """Start the tray icon in its own thread (non-blocking)."""

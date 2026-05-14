@@ -23,6 +23,10 @@ def _default_config_path() -> Path:
     return _config_dir() / "config.toml"
 
 
+def log_file_path() -> Path:
+    return _config_dir() / "app.log"
+
+
 @dataclass
 class Config:
     poll_interval_seconds: int = 30           # 30 seconds

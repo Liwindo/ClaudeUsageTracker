@@ -7,6 +7,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import Callable, Optional
 
+from .config import log_file_path
 from .models import UsageData
 
 # ── Design tokens ─────────────────────────────────────────────────────────────
@@ -92,6 +93,8 @@ class Widget:
         self._grip: Optional[tk.Label] = None
         self._btns_visible = False
         self._last_data: Optional[UsageData] = None
+        self._last_error: Optional[str] = None
+        self._lbl_ft: Optional[tk.Label] = None
 
     # ── Public API (thread-safe) ──────────────────────────────────────────────
 
@@ -158,10 +161,12 @@ class Widget:
         self._dot.pack(side="left")
 
         self._var_ft = tk.StringVar(value="connecting…")
-        tk.Label(
+        self._lbl_ft = tk.Label(
             foot, textvariable=self._var_ft,
             font=_FONT_FT, bg=_BG, fg=_FOOT_C,
-        ).pack(side="left", padx=(4, 0))
+        )
+        self._lbl_ft.pack(side="left", padx=(4, 0))
+        self._attach_tooltip(self._lbl_ft, self._tooltip_text)
 
         self._build_buttons(foot)
 
@@ -229,6 +234,41 @@ class Widget:
             )
             btn.pack(side="left", padx=1)
             self._buttons.append(btn)
+
+    # ── Tooltip ───────────────────────────────────────────────────────────────
+
+    def _attach_tooltip(self, widget: tk.Widget, text_fn: Callable[[], str]) -> None:
+        tip: list[Optional[tk.Toplevel]] = [None]
+
+        def show(_e=None) -> None:
+            text = text_fn()
+            if not text or tip[0]:
+                return
+            x = widget.winfo_rootx()
+            y = widget.winfo_rooty() - 36
+            t = tk.Toplevel(widget)
+            t.wm_overrideredirect(True)
+            t.wm_geometry(f"+{x}+{y}")
+            t.attributes("-topmost", True)
+            tk.Label(
+                t, text=text, bg="#1e1e22", fg=_TEXT,
+                font=_FONT_FT, relief="flat", padx=8, pady=5,
+                wraplength=320, justify="left",
+            ).pack()
+            tip[0] = t
+
+        def hide(_e=None) -> None:
+            if tip[0]:
+                tip[0].destroy()
+                tip[0] = None
+
+        widget.bind("<Enter>", show)
+        widget.bind("<Leave>", hide)
+
+    def _tooltip_text(self) -> str:
+        if self._last_error is None:
+            return ""
+        return f"{self._last_error}\n\nLog: {log_file_path()}"
 
     # ── Hover (polled) ────────────────────────────────────────────────────────
 
@@ -345,6 +385,7 @@ class Widget:
 
     def _apply_data(self, data: UsageData) -> None:
         self._last_data = data
+        self._last_error = None
         s = data.session_percent
         w = self._find_weekly(data)
 
@@ -358,15 +399,23 @@ class Widget:
         self._dot.configure(fg=_reset_color(li))
 
     def _apply_error(self, message: str) -> None:
+        self._last_error = message
         self._set_metric(self._var_s, self._lbl_s, self._bar_s, None)
         self._set_metric(self._var_w, self._lbl_w, self._bar_w, None)
         lc = message.lower()
         if "expired" in lc or "401" in lc:
-            self._var_ft.set("session expired")
+            short = "Session expired — open claude.ai in Firefox"
+        elif "403" in lc or "cloudflare" in lc:
+            short = "Blocked by Cloudflare — visit claude.ai in Firefox"
         elif "cookie" in lc or "firefox" in lc:
-            self._var_ft.set("no Firefox cookie")
+            short = "Log in to claude.ai in Firefox first"
+        elif "429" in lc or "rate" in lc:
+            short = "Rate limited — waiting for next poll"
+        elif "network" in lc or "connect" in lc or "timeout" in lc:
+            short = "Network error — check connection"
         else:
-            self._var_ft.set("error")
+            short = "Error — hover here for details"
+        self._var_ft.set(short)
         self._dot.configure(fg=_ALERT)
 
     def _set_metric(
