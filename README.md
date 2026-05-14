@@ -1,5 +1,9 @@
 # Claude Usage Monitor
 
+<p align="center">
+  <img src="src/claude_usage_monitor/assets/logo.png" alt="Claude Usage Tracker" width="200">
+</p>
+
 A lightweight Windows system-tray tool that shows your [claude.ai](https://claude.ai) usage limits at a glance — without opening a browser tab.
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints that Anthropic has not publicly documented. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
