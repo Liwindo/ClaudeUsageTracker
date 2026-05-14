@@ -80,7 +80,10 @@ class LimitInfo:
     def from_api(cls, key: str, data: dict[str, Any]) -> LimitInfo:
         label = _CODENAME_LABELS.get(key, f"Unknown ({key})")
         percent = cls._parse_utilization(data.get("utilization", 0))
-        resets_at = datetime.fromisoformat(data["resets_at"])
+        try:
+            resets_at = datetime.fromisoformat(data["resets_at"])
+        except (KeyError, TypeError, ValueError):
+            resets_at = datetime.now(tz=timezone.utc)
         return cls(key=key, label=label, percent=percent, resets_at=resets_at)
 
 

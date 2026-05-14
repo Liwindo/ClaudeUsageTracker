@@ -95,6 +95,7 @@ class Widget:
         self._last_data: Optional[UsageData] = None
         self._last_error: Optional[str] = None
         self._lbl_ft: Optional[tk.Label] = None
+        self._tooltip_win: Optional[tk.Toplevel] = None
 
     # ── Public API (thread-safe) ──────────────────────────────────────────────
 
@@ -166,7 +167,6 @@ class Widget:
             font=_FONT_FT, bg=_BG, fg=_FOOT_C,
         )
         self._lbl_ft.pack(side="left", padx=(4, 0))
-        self._attach_tooltip(self._lbl_ft, self._tooltip_text)
 
         self._build_buttons(foot)
 
@@ -235,40 +235,31 @@ class Widget:
             btn.pack(side="left", padx=1)
             self._buttons.append(btn)
 
-    # ── Tooltip ───────────────────────────────────────────────────────────────
+    # ── Tooltip (poll-based — <Enter>/<Leave> unreliable on overrideredirect) ──
 
-    def _attach_tooltip(self, widget: tk.Widget, text_fn: Callable[[], str]) -> None:
-        tip: list[Optional[tk.Toplevel]] = [None]
+    def _show_tooltip(self) -> None:
+        if self._tooltip_win or not self._last_error or not self._lbl_ft:
+            return
+        text = f"{self._last_error}\n\nLog: {log_file_path()}"
+        x = self._lbl_ft.winfo_rootx()
+        y = self._lbl_ft.winfo_rooty() - 8
+        t = tk.Toplevel(self._root)
+        t.wm_overrideredirect(True)
+        t.attributes("-topmost", True)
+        lbl = tk.Label(
+            t, text=text, bg="#1e1e22", fg=_TEXT,
+            font=_FONT_FT, relief="flat", padx=8, pady=5,
+            wraplength=340, justify="left",
+        )
+        lbl.pack()
+        t.update_idletasks()
+        t.wm_geometry(f"+{x}+{y - t.winfo_height()}")
+        self._tooltip_win = t
 
-        def show(_e=None) -> None:
-            text = text_fn()
-            if not text or tip[0]:
-                return
-            x = widget.winfo_rootx()
-            y = widget.winfo_rooty() - 36
-            t = tk.Toplevel(widget)
-            t.wm_overrideredirect(True)
-            t.wm_geometry(f"+{x}+{y}")
-            t.attributes("-topmost", True)
-            tk.Label(
-                t, text=text, bg="#1e1e22", fg=_TEXT,
-                font=_FONT_FT, relief="flat", padx=8, pady=5,
-                wraplength=320, justify="left",
-            ).pack()
-            tip[0] = t
-
-        def hide(_e=None) -> None:
-            if tip[0]:
-                tip[0].destroy()
-                tip[0] = None
-
-        widget.bind("<Enter>", show)
-        widget.bind("<Leave>", hide)
-
-    def _tooltip_text(self) -> str:
-        if self._last_error is None:
-            return ""
-        return f"{self._last_error}\n\nLog: {log_file_path()}"
+    def _hide_tooltip(self) -> None:
+        if self._tooltip_win:
+            self._tooltip_win.destroy()
+            self._tooltip_win = None
 
     # ── Hover (polled) ────────────────────────────────────────────────────────
 
@@ -290,6 +281,20 @@ class Widget:
             self._btns_visible = False
             for btn in self._buttons:
                 btn.configure(fg=_BG, bg=_BG)
+
+        # Tooltip: show when mouse is over the footer label and there's an error
+        if self._last_error and self._lbl_ft:
+            lx = self._lbl_ft.winfo_rootx()
+            ly = self._lbl_ft.winfo_rooty()
+            lw = self._lbl_ft.winfo_width()
+            lh = self._lbl_ft.winfo_height()
+            over_label = lx <= x < lx + lw and ly <= y < ly + lh
+            if over_label:
+                self._show_tooltip()
+            else:
+                self._hide_tooltip()
+        elif self._tooltip_win:
+            self._hide_tooltip()
 
         self._root.after(100, self._poll_hover)
 
