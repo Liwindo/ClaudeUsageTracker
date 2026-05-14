@@ -11,18 +11,19 @@ from .config import log_file_path
 from .models import UsageData
 
 # ── Design tokens ─────────────────────────────────────────────────────────────
-# RGBA values pre-blended onto card bg (#16161a) — tkinter has no rgba support.
 _BG      = "#16161a"
 _TEXT    = "#e6e6ea"
-_DIM     = "#88888c"   # rgba(230,230,234,.55) on _BG
-_FOOT_C  = "#747478"   # rgba(230,230,234,.45) on _BG
-_BORDER  = "#29292c"   # rgba(255,255,255,.08) on _BG
-_TRACK   = "#242428"   # rgba(255,255,255,.06) on _BG
+_DIM     = "#88888c"
+_FOOT_C  = "#747478"
+_BORDER  = "#29292c"
+_TRACK   = "#242428"
 _BTN_BG  = "#242428"
 _BTN_HOV = "#323235"
-_OK      = "#3da46e"
-_WARN    = "#d39a4a"
-_ALERT   = "#d6553a"
+# Status colours — identical to tray.py so widget and icon stay in sync
+_OK      = "#22c55e"
+_YELLOW  = "#eab308"
+_WARN    = "#f97316"
+_ALERT   = "#ef4444"
 
 _FONT_LBL = ("Segoe UI", 8)
 _FONT_PCT = ("Consolas", 11, "bold")
@@ -45,6 +46,8 @@ def _pct_color(pct: int) -> str:
         return _ALERT
     if pct >= 60:
         return _WARN
+    if pct >= 40:
+        return _YELLOW
     return _OK
 
 
@@ -53,9 +56,11 @@ def _reset_color(li) -> str:
     if li is None:
         return _OK
     secs = li.resets_in_seconds
-    if secs < 30 * 60:    # < 30 min  → green
+    if secs < 15 * 60:    # < 15 min  → green
         return _OK
-    if secs < 90 * 60:    # < 1.5 h   → yellow
+    if secs < 30 * 60:    # < 30 min  → yellow
+        return _YELLOW
+    if secs < 90 * 60:    # < 1.5 h   → orange
         return _WARN
     return _ALERT          # ≥ 1.5 h   → red
 

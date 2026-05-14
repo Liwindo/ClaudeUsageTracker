@@ -20,6 +20,9 @@ htmlcov/
 # PyInstaller (spec is kept in the repo, build artefacts are not)
 *.spec.bak
 
+# Static analysis output
+static_analysis_semgrep*/
+
 # IDE
 .vscode/
 .idea/
