@@ -42,7 +42,7 @@ The coloured circle reflects your current **session (5-hour)** limit:
 | 🔴 Red    | 85%+        |
 | ⚫ Grey   | No data / error |
 
-Right-click the icon for **Refresh now** and **Quit**.
+Right-click the icon for **Show widget**, **Refresh now**, **View log file**, and **Quit**.
 
 ## Floating widget
 
@@ -50,11 +50,22 @@ An always-on-top mini-panel shows:
 
 - **Session** — 5-hour usage % with progress bar
 - **Weekly** — weekly usage % with progress bar
-- **Reset countdown** — time until the session limit resets; the dot turns green as the reset approaches
+- **Reset countdown** — time until the session limit resets; the dot colour indicates how soon the limit refreshes:
+
+  | Dot colour | Time until reset |
+  |------------|-----------------|
+  | 🟢 Green  | < 15 min        |
+  | 🟡 Yellow | 15–30 min       |
+  | 🟠 Orange | 30–90 min       |
+  | 🔴 Red    | > 90 min        |
+
+- Progress bars use the same four-colour scale as the tray icon (green → yellow → orange → red at 40 / 60 / 85 %)
 - Hover to reveal **refresh (⟳)**, **minimise (−)**, and **quit (×)** buttons
 - Drag anywhere to reposition; drag the bottom-right grip to resize
 - Right-click for a context menu
 - Position and size are remembered between sessions
+
+**Error display** — when a poll fails, the footer shows a short inline message (e.g. *"Session expired — open claude.ai in Firefox"*). For unexpected errors it shows *"Error — hover here for details"*; hovering over that text reveals a tooltip with the full error message and the path to the log file.
 
 Minimise via the **−** button; restore via the tray icon (left-click or **Show widget**).
 
