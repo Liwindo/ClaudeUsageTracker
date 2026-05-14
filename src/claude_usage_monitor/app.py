@@ -35,7 +35,7 @@ class App:
         )
 
         self._tray = TrayIcon(
-            on_click_open=self._widget.restore,
+            on_click_open=self._widget.toggle,
             on_click_refresh=self._on_refresh_requested,
             on_quit=self._quit,
         )
