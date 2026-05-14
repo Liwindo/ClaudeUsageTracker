@@ -23,6 +23,7 @@ exe = EXE(
     a.datas,
     [],
     name='ClaudeUsageMonitor',
+    icon='src/claude_usage_monitor/assets/logo.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
