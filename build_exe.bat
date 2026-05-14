@@ -11,12 +11,12 @@ echo   Directory : %CD%
 for /f "tokens=*" %%v in ('uv --version 2^>nul') do echo   uv        : %%v
 echo.
 
-:: ── Step 1: Install project dependencies ─────────────────────────────────────
-echo [1/3] Installing project dependencies...
-uv sync
+:: ── Step 1: Install all dependencies (including PyInstaller) ─────────────────
+echo [1/2] Installing dependencies...
+uv sync --extra dev
 if errorlevel 1 (
     echo.
-    echo   ERROR: "uv sync" failed.
+    echo   ERROR: "uv sync --extra dev" failed.
     echo.
     echo   Possible causes:
     echo     - uv is not installed. Get it from: https://docs.astral.sh/uv/
@@ -24,33 +24,25 @@ if errorlevel 1 (
     echo.
     pause & exit /b 1
 )
-echo   Dependencies OK.
-echo.
 
-:: ── Step 2: Ensure PyInstaller is available ───────────────────────────────────
 if not exist ".venv\Scripts\pyinstaller.exe" (
-    echo [2/3] Installing PyInstaller ^(one-time^)...
-    uv pip install --python .venv\Scripts\python.exe pyinstaller
-    if errorlevel 1 (
-        echo.
-        echo   ERROR: PyInstaller installation failed.
-        echo   Try manually: uv pip install --python .venv\Scripts\python.exe pyinstaller
-        echo.
-        pause & exit /b 1
-    )
-    echo   PyInstaller installed successfully.
-) else (
-    for /f "tokens=*" %%v in ('.venv\Scripts\pyinstaller.exe --version 2^>nul') do echo [2/3] PyInstaller %%v - OK.
+    echo.
+    echo   ERROR: pyinstaller.exe not found in .venv\Scripts\ after sync.
+    echo   This is unexpected. Try: uv sync --extra dev --reinstall
+    echo.
+    pause & exit /b 1
 )
+
+for /f "tokens=*" %%v in ('.venv\Scripts\pyinstaller.exe --version 2^>nul') do echo   PyInstaller %%v - OK.
 echo.
 
-:: ── Step 3: Build EXE ─────────────────────────────────────────────────────────
+:: ── Step 2: Build EXE ─────────────────────────────────────────────────────────
 if exist dist\ClaudeUsageMonitor.exe (
     echo   Removing old EXE...
     del /q dist\ClaudeUsageMonitor.exe
 )
 
-echo [3/3] Building EXE...
+echo [2/2] Building EXE...
 echo   ^(First build ~30s  ^|  Rebuild with cache ~10s^)
 echo.
 .venv\Scripts\pyinstaller.exe ClaudeUsageMonitor.spec
