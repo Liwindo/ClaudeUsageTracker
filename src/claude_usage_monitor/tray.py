@@ -68,7 +68,7 @@ class TrayIcon:
 
     def _build_icon(self) -> pystray.Icon:
         menu = pystray.Menu(
-            pystray.MenuItem("Show widget", self._open, default=True),
+            pystray.MenuItem("Show / hide widget", self._open, default=True),
             pystray.MenuItem("Refresh now", self._refresh),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("View log file", self._view_log),

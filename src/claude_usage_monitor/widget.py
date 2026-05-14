@@ -131,6 +131,17 @@ class Widget:
             self._root.after(0, self._root.deiconify)
             self._root.after(0, lambda: self._root.attributes("-topmost", True))
 
+    def toggle(self) -> None:
+        """Show the widget if hidden, hide it if visible."""
+        if self._root:
+            def _do():
+                if self._root.state() == "withdrawn":
+                    self._root.deiconify()
+                    self._root.attributes("-topmost", True)
+                else:
+                    self._root.withdraw()
+            self._root.after(0, _do)
+
     def update(self, data: UsageData) -> None:
         if self._root:
             self._root.after(0, self._apply_data, data)
