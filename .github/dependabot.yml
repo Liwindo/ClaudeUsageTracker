@@ -1,0 +1,15 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      python-packages:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "pyinstaller"
+        update-types: ["version-update:semver-major"]
