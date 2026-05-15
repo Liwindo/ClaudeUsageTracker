@@ -3,16 +3,14 @@
 Firefox stores cookies unencrypted in an SQLite database at:
   %APPDATA%\\Mozilla\\Firefox\\Profiles\\<profile>\\cookies.sqlite
 
-We copy the file before reading to avoid issues with Firefox's file lock.
-No credentials are stored; cookies are read fresh before every poll cycle.
+The database is opened read-only via SQLite URI (mode=ro). Firefox's WAL
+journal mode allows concurrent reads without needing a file copy.
 """
 
 from __future__ import annotations
 
 import configparser
-import shutil
 import sqlite3
-import tempfile
 import time
 from pathlib import Path
 
@@ -66,42 +64,28 @@ def _find_default_profile() -> Path:
     raise FirefoxCookieError("No usable Firefox profile directory found.")
 
 
-def _copy_cookies_db(profile_dir: Path) -> Path:
-    """Copy cookies.sqlite to a temp file and return its path.
-
-    Firefox keeps a write-lock on the live DB; reading the copy avoids
-    'database is locked' errors without touching the original.
-    """
-    src = profile_dir / "cookies.sqlite"
-    if not src.exists():
-        raise FirefoxCookieError(
-            f"cookies.sqlite not found in Firefox profile: {profile_dir}\n"
-            "Make sure Firefox has been launched at least once."
-        )
-
-    tmp = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
-    tmp.close()
-    shutil.copy2(src, tmp.name)
-    return Path(tmp.name)
-
-
 def _query_cookies(db_path: Path, host: str) -> dict[str, str]:
-    """Return all non-expired cookies for *host* as {name: value}."""
+    """Read all non-expired cookies for *host* directly without copying."""
     now_seconds = int(time.time())
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        cur = conn.execute(
-            """
-            SELECT name, value
-            FROM   moz_cookies
-            WHERE  host LIKE ?
-              AND  expiry > ?
-            """,
-            (f"%{host}%", now_seconds),
-        )
-        return {row[0]: row[1] for row in cur.fetchall()}
-    finally:
-        conn.close()
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            cur = conn.execute(
+                """
+                SELECT name, value
+                FROM   moz_cookies
+                WHERE  host LIKE ?
+                  AND  expiry > ?
+                """,
+                (f"%{host}%", now_seconds),
+            )
+            return {row[0]: row[1] for row in cur.fetchall()}
+        finally:
+            conn.close()
+    except sqlite3.Error as exc:
+        raise FirefoxCookieError(
+            f"Could not read Firefox cookie database: {exc}"
+        ) from exc
 
 
 def get_claude_cookies(profile_dir: Path | None = None) -> dict[str, str]:
@@ -117,12 +101,14 @@ def get_claude_cookies(profile_dir: Path | None = None) -> dict[str, str]:
         FirefoxCookieError: If the profile or cookie DB cannot be found/read.
     """
     resolved = profile_dir or _find_default_profile()
-    tmp_db = _copy_cookies_db(resolved)
-    try:
-        cookies = _query_cookies(tmp_db, _CLAUDE_HOST)
-    finally:
-        tmp_db.unlink(missing_ok=True)
+    db_path = resolved / "cookies.sqlite"
+    if not db_path.exists():
+        raise FirefoxCookieError(
+            f"cookies.sqlite not found in Firefox profile: {resolved}\n"
+            "Make sure Firefox has been launched at least once."
+        )
 
+    cookies = _query_cookies(db_path, _CLAUDE_HOST)
     if not cookies:
         raise FirefoxCookieError(
             "No claude.ai cookies found in Firefox. "
@@ -131,13 +117,17 @@ def get_claude_cookies(profile_dir: Path | None = None) -> dict[str, str]:
     return cookies
 
 
+class CookieError(Exception):
+    """Browser-agnostic cookie error used for org-ID failures."""
+
+
 def extract_org_id(cookies: dict[str, str]) -> str:
     """Pull the organisation UUID from the lastActiveOrg cookie."""
     org_id = cookies.get("lastActiveOrg", "").strip('"')
     if not org_id:
-        raise FirefoxCookieError(
+        raise CookieError(
             "lastActiveOrg cookie not found. "
-            "Visit claude.ai in Firefox to set an active organisation."
+            "Visit claude.ai in your browser to set an active organisation."
         )
     return org_id
 

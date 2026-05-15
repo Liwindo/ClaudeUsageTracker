@@ -1,4 +1,4 @@
-# Claude Usage Monitor
+# Claude Usage Tracker
 
 <p align="center">
   <img src="src/claude_usage_monitor/assets/logo.png" alt="Claude Usage Tracker" width="200">
@@ -18,8 +18,8 @@ This tool puts the information where you can always see it: a colour-coded tray 
 
 **Option A — Download the EXE (no Python required)**
 
-1. Download `ClaudeUsageMonitor.exe` from the [latest release](../../releases/latest)
-2. Double-click it — it starts silently in the system tray
+1. Download `ClaudeUsageTracker.exe` from the [latest release](../../releases/latest)
+2. Double-click it — it starts in the system tray
 
 **Option B — Build from source**
 
@@ -28,16 +28,28 @@ This tool puts the information where you can always see it: a colour-coded tray 
    ```
    build_exe.bat
    ```
-   The script handles everything (dependencies, PyInstaller, build). The EXE ends up in `dist\ClaudeUsageMonitor.exe`.
+   The script handles everything (dependencies, PyInstaller, build). The EXE ends up in `dist\ClaudeUsageTracker.exe`.
 
 ## How it works
 
-The tool reads your existing Firefox session cookies directly from Firefox's local cookie database — **no passwords, no manual exports, no stored credentials**. It then polls `claude.ai`'s internal `/usage` endpoint every 30 seconds (configurable) and updates the tray icon and floating widget accordingly. Firefox does not need to be open while the tool is running.
+The tool reads your existing session cookies directly from Firefox's local cookie database — **no passwords, no manual exports, no stored credentials**. It then polls `claude.ai`'s internal `/usage` endpoint every 30 seconds (configurable) and updates the tray icon and floating widget accordingly. Firefox does not need to be open while the tool is running.
+
+Cookie values are read directly from the database file using a read-only SQLite connection. Firefox's WAL journal mode allows concurrent reads without needing a file copy.
+
+## Why Firefox only?
+
+Chrome (and other Chromium-based browsers) introduced **App-Bound Encryption** in version 127 (July 2024). Cookie values are encrypted with a key that is cryptographically tied to the Chrome application itself — decryption requires Chrome's own elevation service and cannot be performed by any external process, regardless of permissions.
+
+In practice, this means:
+- When Chrome is **running**: the Cookies database file is locked exclusively — no other process can read or copy it.
+- When Chrome is **closed**: the file can be read, but the cookie values are encrypted with a key only Chrome can access — they cannot be decrypted externally.
+
+This is a deliberate security measure by Google to prevent cookie theft, and there is no user-space workaround. Firefox stores cookies unencrypted in its SQLite database and does not apply equivalent restrictions, making it the only reliably supported browser for this tool.
 
 ## Requirements
 
 - Windows 10/11
-- Firefox — must be logged in to claude.ai at least once to populate the cookie database
+- **Firefox**, logged in to claude.ai
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/) *(only if building from source)*
 
 ## Tray icon
@@ -52,7 +64,7 @@ The coloured circle reflects your current **session (5-hour)** limit:
 | 🔴 Red    | 85%+        |
 | ⚫ Grey   | No data / error |
 
-Right-click the icon for **Show widget**, **Refresh now**, **View log file**, and **Quit**.
+Left-click the icon to show or hide the widget. Right-click for **Show / hide widget**, **Refresh now**, **View log file**, **Open app data folder**, and **Quit**.
 
 ## Floating widget
 
@@ -77,8 +89,6 @@ An always-on-top mini-panel shows:
 
 **Error display** — when a poll fails, the footer shows a short inline message (e.g. *"Session expired — open claude.ai in Firefox"*). For unexpected errors it shows *"Error — hover here for details"*; hovering over that text reveals a tooltip with the full error message and the path to the log file.
 
-Minimise via the **−** button; restore via the tray icon (left-click or **Show widget**).
-
 ## Configuration
 
 The config file is created automatically on first run at:
@@ -96,25 +106,22 @@ poll_interval_seconds = 30
 # Percent thresholds that trigger a desktop notification.
 notification_thresholds = [80, 95]
 
-# Override the Firefox profile directory.
-# Leave empty for auto-detection (recommended).
-firefox_profile_path = ""
-
 # Log level: DEBUG, INFO, WARNING, ERROR
 log_level = "WARNING"
+
+# Override the Firefox profile directory (leave empty for auto-detection).
+firefox_profile_path = ""
 ```
 
-### Custom Firefox profile
+### Custom Firefox profile path
 
-If auto-detection fails (e.g. you use a non-default profile), set the path manually:
+If auto-detection picks the wrong profile, set the path manually:
 
 ```toml
 firefox_profile_path = "C:\\Users\\YourName\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\abc123.default-release"
 ```
 
 ## Running from source
-
-If you want to run without building an EXE:
 
 ```bash
 uv sync
@@ -141,45 +148,46 @@ build_exe_clean.bat
 
 ### Grey icon / "No claude.ai cookies found"
 
-Firefox must be logged in to claude.ai. Open [claude.ai](https://claude.ai) in Firefox and log in, then wait for the next poll or right-click the tray icon → **Refresh now**.
+You must be logged in to claude.ai in Firefox. Open [claude.ai](https://claude.ai), log in, then right-click the tray icon → **Refresh now**.
 
 ### "Session expired" / grey icon after working for a while
 
-Your Cloudflare clearance cookie has expired. Visit claude.ai in Firefox — browsing the page automatically refreshes the cookie. The next poll will succeed.
-
-### "Firefox profiles.ini not found"
-
-Firefox is either not installed or has never been launched. Install Firefox and log in to claude.ai.
+Your Cloudflare clearance cookie has expired. Visit claude.ai in Firefox — navigating the page refreshes the cookie automatically. The next poll will succeed.
 
 ### Requests return 403
 
-Cloudflare is blocking the request. Usually the `cf_clearance` cookie is stale. Open claude.ai in Firefox, navigate around briefly, then right-click → **Refresh now**.
+Cloudflare is blocking the request. The `cf_clearance` cookie is likely stale. Open claude.ai in Firefox, navigate around briefly, then right-click → **Refresh now**.
+
+### "Firefox profiles.ini not found"
+
+Firefox has not been launched yet or is not installed. Launch Firefox, log in to claude.ai, then restart this tool.
 
 ### The usage numbers seem wrong
 
 The `/usage` endpoint uses Anthropic's internal bucket names (e.g. `seven_day_omelette`). The mapping to human-readable labels is best-effort and may be incorrect. Open an issue if you can confirm the correct mapping for your plan.
 
+## Privacy
+
+- No data leaves your machine except the HTTPS requests to `claude.ai` (which your browser already makes).
+- Cookie values are read directly from the Firefox database without copying the file to disk.
+- Firefox cookies are stored unencrypted in the SQLite database; they are read into memory for the duration of each poll only and are never written to any other file.
+- No telemetry.
+
 ## Project structure
 
 ```
 src/claude_usage_monitor/
-├── __main__.py         Entry point
-├── app.py              Orchestration (threads, callbacks)
-├── config.py           TOML config, OS paths
-├── firefox_cookies.py  Read cookies.sqlite from Firefox
-├── client.py           httpx calls to claude.ai (⚠ reverse-engineered)
-├── models.py           UsageData / LimitInfo dataclasses
-├── poller.py           Background polling thread
-├── tray.py             pystray icon + colour logic
-├── widget.py           Persistent always-on-top tkinter widget
-└── notifications.py    Desktop notification throttling
+├── __main__.py          Entry point
+├── app.py               Orchestration (threads, callbacks)
+├── config.py            TOML config, OS paths
+├── firefox_cookies.py   Read cookies.sqlite from Firefox (read-only, no copy)
+├── client.py            httpx calls to claude.ai (⚠ reverse-engineered)
+├── models.py            UsageData / LimitInfo dataclasses
+├── poller.py            Background polling thread
+├── tray.py              pystray icon + colour logic
+├── widget.py            Persistent always-on-top tkinter widget
+└── notifications.py     Desktop notification throttling
 ```
-
-## Privacy
-
-- No data leaves your machine except the HTTPS requests to `claude.ai` (which your browser already makes).
-- No cookies or tokens are stored to disk by this tool; they are read fresh from Firefox before every poll.
-- No telemetry.
 
 ## License
 

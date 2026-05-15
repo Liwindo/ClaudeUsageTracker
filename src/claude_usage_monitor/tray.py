@@ -8,7 +8,7 @@ from typing import Callable
 from PIL import Image, ImageDraw
 import pystray
 
-from .config import log_file_path
+from .config import log_file_path, _config_dir
 from .models import UsageData
 
 _ICON_SIZE = 64
@@ -72,13 +72,14 @@ class TrayIcon:
             pystray.MenuItem("Refresh now", self._refresh),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("View log file", self._view_log),
+            pystray.MenuItem("Open app data folder", self._open_appdata),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit", self._quit),
         )
         icon = pystray.Icon(
             name="claude-usage-monitor",
             icon=_make_icon_image("grey"),
-            title="Claude Usage Monitor — loading…",
+            title="Claude Usage Tracker — loading…",
             menu=menu,
         )
         return icon
@@ -97,6 +98,11 @@ class TrayIcon:
         p = log_file_path()
         if p.exists():
             os.startfile(str(p))
+
+    def _open_appdata(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        d = _config_dir()
+        d.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(d))
 
     def run(self) -> None:
         """Start the tray icon in its own thread (non-blocking)."""

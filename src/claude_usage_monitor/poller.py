@@ -13,6 +13,7 @@ from typing import Callable
 from .client import ClaudeClientError, SessionExpiredError, fetch_all
 from .config import Config
 from .firefox_cookies import (
+    CookieError,
     FirefoxCookieError,
     build_cookie_header,
     extract_org_id,
@@ -27,14 +28,7 @@ OnErrorCallback = Callable[[str], None]
 
 
 class Poller:
-    """Periodic background worker that fetches claude.ai usage data.
-
-    Usage:
-        poller = Poller(config, on_data=my_fn, on_error=err_fn)
-        poller.start()
-        # … later …
-        poller.stop()
-    """
+    """Periodic background worker that fetches claude.ai usage data."""
 
     def __init__(
         self,
@@ -56,7 +50,7 @@ class Poller:
     def stop(self) -> None:
         logger.info("Poller stopping.")
         self._stop_event.set()
-        self._force_event.set()   # unblock any waiting sleep
+        self._force_event.set()
         self._thread.join(timeout=5)
 
     def refresh_now(self) -> None:
@@ -64,10 +58,8 @@ class Poller:
         self._force_event.set()
 
     def _loop(self) -> None:
-        # Poll immediately on start, then wait for the interval.
         while not self._stop_event.is_set():
             self._poll()
-            # Wait for either the interval to elapse or a forced refresh.
             self._force_event.wait(timeout=self._config.poll_interval_seconds)
             self._force_event.clear()
 
@@ -88,9 +80,9 @@ class Poller:
             msg = str(exc)
             logger.warning("Session expired: %s", msg)
             self._on_error(msg)
-        except FirefoxCookieError as exc:
+        except (FirefoxCookieError, CookieError) as exc:
             msg = str(exc)
-            logger.warning("Firefox cookie error: %s", msg)
+            logger.warning("Browser cookie error: %s", msg)
             self._on_error(msg)
         except ClaudeClientError as exc:
             msg = str(exc)

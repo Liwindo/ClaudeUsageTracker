@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Claude Usage Monitor - Clean Build
+title Claude Usage Tracker - Clean Build
 
 echo ============================================================
-echo   Claude Usage Monitor - Clean Build
+echo   Claude Usage Tracker - Clean Build
 echo   ^(deletes build cache for a fresh rebuild^)
 echo ============================================================
 echo.
