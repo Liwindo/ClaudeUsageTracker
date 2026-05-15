@@ -36,6 +36,8 @@ The tool reads your existing session cookies directly from Firefox's local cooki
 
 Cookie values are read directly from the database file using a read-only SQLite connection. Firefox's WAL journal mode allows concurrent reads without needing a file copy.
 
+On each poll cycle the tool calls two endpoints: `/api/bootstrap/{org}/app_start` to determine the subscription tier (cached for one hour to halve the request volume) and `/api/organizations/{org}/usage` for the actual limits.
+
 ## Why Firefox only?
 
 Chrome (and other Chromium-based browsers) introduced **App-Bound Encryption** in version 127 (July 2024). Cookie values are encrypted with a key that is cryptographically tied to the Chrome application itself — decryption requires Chrome's own elevation service and cannot be performed by any external process, regardless of permissions.
@@ -49,7 +51,7 @@ This is a deliberate security measure by Google to prevent cookie theft, and the
 ## Requirements
 
 - Windows 10/11
-- **Firefox**, logged in to claude.ai
+- **Firefox** (Mozilla build), logged in to claude.ai. Firefox forks such as LibreWolf, Floorp, or Waterfox use different `AppData` paths and are not auto-detected — point `firefox_profile_path` at the fork's profile if you want to try them.
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/) *(only if building from source)*
 
 ## Tray icon
@@ -106,7 +108,10 @@ poll_interval_seconds = 30
 # Percent thresholds that trigger a desktop notification.
 notification_thresholds = [80, 95]
 
-# Log level: DEBUG, INFO, WARNING, ERROR
+# Log level: DEBUG, INFO, WARNING, ERROR.
+# Note: at DEBUG level the full claude.ai /usage response (including
+# organisation UUID and bucket data) is written to app.log. Keep WARNING
+# unless you're actively debugging, and review the log before sharing it.
 log_level = "WARNING"
 
 # Override the Firefox profile directory (leave empty for auto-detection).
@@ -186,7 +191,8 @@ src/claude_usage_monitor/
 ├── poller.py            Background polling thread
 ├── tray.py              pystray icon + colour logic
 ├── widget.py            Persistent always-on-top tkinter widget
-└── notifications.py     Desktop notification throttling
+├── notifications.py     Desktop notification throttling
+└── assets/              Application icons (logo.png, logo.ico)
 ```
 
 ## License

@@ -140,17 +140,6 @@ class UsageData:
                 return li.percent
         return None
 
-    def status_color(self) -> str:
-        """Return a color name matching the threshold rules."""
-        p = self.highest_percent
-        if p >= 95:
-            return "red"
-        if p >= 80:
-            return "orange"
-        if p >= 50:
-            return "yellow"
-        return "green"
-
     def tooltip_text(self) -> str:
         """Short one-line tooltip for the tray icon."""
         parts = [f"{li.label} {li.percent}%" for li in self.limits]

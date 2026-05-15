@@ -10,9 +10,12 @@ journal mode allows concurrent reads without needing a file copy.
 from __future__ import annotations
 
 import configparser
+import re
 import sqlite3
 import time
 from pathlib import Path
+
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 _FIREFOX_APPDATA = Path.home() / "AppData" / "Roaming" / "Mozilla" / "Firefox"
@@ -65,7 +68,13 @@ def _find_default_profile() -> Path:
 
 
 def _query_cookies(db_path: Path, host: str) -> dict[str, str]:
-    """Read all non-expired cookies for *host* directly without copying."""
+    """Read all non-expired cookies for *host* directly without copying.
+
+    Matches the exact host and any subdomain (host-only `claude.ai` and
+    domain cookies stored as `.claude.ai` / `.sub.claude.ai`). An earlier
+    `LIKE '%host%'` pattern would have matched unrelated domains like
+    `notclaude.ai` or `evil-claude.ai.example.com`.
+    """
     now_seconds = int(time.time())
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
@@ -74,10 +83,10 @@ def _query_cookies(db_path: Path, host: str) -> dict[str, str]:
                 """
                 SELECT name, value
                 FROM   moz_cookies
-                WHERE  host LIKE ?
+                WHERE  (host = ? OR host = ? OR host LIKE ?)
                   AND  expiry > ?
                 """,
-                (f"%{host}%", now_seconds),
+                (host, f".{host}", f"%.{host}", now_seconds),
             )
             return {row[0]: row[1] for row in cur.fetchall()}
         finally:
@@ -122,12 +131,21 @@ class CookieError(Exception):
 
 
 def extract_org_id(cookies: dict[str, str]) -> str:
-    """Pull the organisation UUID from the lastActiveOrg cookie."""
-    org_id = cookies.get("lastActiveOrg", "").strip('"')
+    """Pull the organisation UUID from the lastActiveOrg cookie.
+
+    The value is validated as a canonical UUID before being returned so it
+    cannot smuggle extra path segments into the API URL.
+    """
+    org_id = cookies.get("lastActiveOrg", "").strip('"').lower()
     if not org_id:
         raise CookieError(
             "lastActiveOrg cookie not found. "
             "Visit claude.ai in your browser to set an active organisation."
+        )
+    if not _UUID_RE.match(org_id):
+        raise CookieError(
+            "lastActiveOrg cookie is not a valid UUID. "
+            "Open claude.ai in Firefox to refresh the session."
         )
     return org_id
 

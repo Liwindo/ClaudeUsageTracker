@@ -96,8 +96,12 @@ class TrayIcon:
 
     def _view_log(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         p = log_file_path()
-        if p.exists():
-            os.startfile(str(p))
+        if not p.exists():
+            # Touch an empty file so the click never appears to do nothing
+            # (logging only writes once something is logged at the active level).
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.touch()
+        os.startfile(str(p))
 
     def _open_appdata(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         d = _config_dir()

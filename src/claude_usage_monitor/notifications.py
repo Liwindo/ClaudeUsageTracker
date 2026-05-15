@@ -35,6 +35,11 @@ class NotificationManager:
         thresholds: Sorted list of integer percent thresholds, e.g. [80, 95].
     """
 
+    # Hysteresis band (percent) below the threshold required to re-arm a fired
+    # notification. Without this, a value oscillating around the threshold
+    # (e.g. 94 ⇄ 95 with threshold=95) would spam notifications every poll.
+    _HYSTERESIS = 10
+
     def __init__(self, thresholds: list[int]) -> None:
         self._thresholds = sorted(thresholds)
         # Set of (bucket_key, threshold) pairs that have already fired.
@@ -49,14 +54,11 @@ class NotificationManager:
                     if key not in self._fired:
                         self._fired.add(key)
                         self._fire_threshold(li.label, li.percent, threshold)
-                else:
-                    # Reset has occurred: clear the fired state for this bucket/threshold
-                    # so the notification fires again next time it crosses.
-                    if key in self._fired:
-                        self._fired.discard(key)
-                        if li.percent < threshold - 10:
-                            # Meaningful drop: announce the reset
-                            self._fire_reset(li.label, li.percent)
+                elif key in self._fired and li.percent < threshold - self._HYSTERESIS:
+                    # Meaningful drop below the hysteresis band: re-arm and
+                    # announce the reset. Stays armed until value re-crosses.
+                    self._fired.discard(key)
+                    self._fire_reset(li.label, li.percent)
 
     def _fire_threshold(self, label: str, percent: int, threshold: int) -> None:
         logger.info("Notification: %s reached %d%% (threshold %d%%)", label, percent, threshold)
