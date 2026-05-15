@@ -7,6 +7,7 @@ They may break without notice if Anthropic changes their internal API.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 _BASE = "https://claude.ai/api"
 _TIMEOUT = httpx.Timeout(15.0)
+
+# Subscription tier rarely changes; refetch at most once per hour to halve the
+# requests against claude.ai (was: tier + usage every poll → 2 req/30 s).
+_TIER_CACHE_SECONDS = 3600
+_tier_cache: dict[str, tuple[str, float]] = {}
 
 # Must match the browser that owns the Firefox session, otherwise Cloudflare
 # may reject the request even with a valid cf_clearance cookie.
@@ -139,6 +145,22 @@ def fetch_usage(
     return UsageData.from_api_response(data, subscription_tier=subscription_tier)
 
 
+def _cached_tier(client: httpx.Client, org_id: str, cookie_header: str) -> str:
+    """Return the cached subscription tier or refetch if the entry is stale."""
+    now = time.monotonic()
+    cached = _tier_cache.get(org_id)
+    if cached and (now - cached[1]) < _TIER_CACHE_SECONDS:
+        return cached[0]
+    try:
+        tier = fetch_subscription_tier(client, org_id, cookie_header)
+    except ClaudeClientError as exc:
+        logger.warning("Could not fetch subscription tier: %s", exc)
+        # On failure keep any previous value rather than dropping to "unknown".
+        return cached[0] if cached else "unknown"
+    _tier_cache[org_id] = (tier, now)
+    return tier
+
+
 def fetch_all(
     org_id: str,
     cookie_header: str,
@@ -149,10 +171,5 @@ def fetch_all(
     to manage connection lifecycle.
     """
     with httpx.Client(timeout=_TIMEOUT, follow_redirects=False) as client:
-        try:
-            tier = fetch_subscription_tier(client, org_id, cookie_header)
-        except ClaudeClientError as exc:
-            logger.warning("Could not fetch subscription tier: %s", exc)
-            tier = "unknown"
-
+        tier = _cached_tier(client, org_id, cookie_header)
         return fetch_usage(client, org_id, cookie_header, subscription_tier=tier)

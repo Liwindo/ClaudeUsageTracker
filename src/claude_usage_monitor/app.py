@@ -9,7 +9,6 @@ Threading model:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from .config import Config
 from .models import UsageData
@@ -24,9 +23,6 @@ logger = logging.getLogger(__name__)
 class App:
     def __init__(self, config: Config) -> None:
         self._config = config
-        self._latest_data: Optional[UsageData] = None
-        self._latest_error: Optional[str] = None
-
         self._notifier = NotificationManager(config.notification_thresholds)
 
         self._widget = Widget(
@@ -53,14 +49,11 @@ class App:
         self._widget.start()     # blocks main thread — tkinter requires the main thread on Windows
 
     def _on_data(self, data: UsageData) -> None:
-        self._latest_data = data
-        self._latest_error = None
         self._tray.update(data)
         self._notifier.process(data)
         self._widget.update(data)
 
     def _on_error(self, message: str) -> None:
-        self._latest_error = message
         self._tray.set_error(message)
         self._widget.set_error(message)
 

@@ -405,6 +405,8 @@ class Widget:
     # ── State updates (always called on the Tk thread via after()) ────────────
 
     def _apply_data(self, data: UsageData) -> None:
+        if self._var_ft is None or self._dot is None:
+            return  # UI not built yet — drop the update
         self._last_data = data
         self._last_error = None
         s = data.session_percent
@@ -420,6 +422,8 @@ class Widget:
         self._dot.configure(fg=_reset_color(li))
 
     def _apply_error(self, message: str) -> None:
+        if self._var_ft is None or self._dot is None:
+            return  # UI not built yet — drop the update
         self._last_error = message
         self._set_metric(self._var_s, self._lbl_s, self._bar_s, None)
         self._set_metric(self._var_w, self._lbl_w, self._bar_w, None)
@@ -469,15 +473,21 @@ class Widget:
 
     @staticmethod
     def _find_weekly(data: UsageData) -> Optional[int]:
-        for key in _WEEKLY_KEYS:
-            for li in data.limits:
-                if li.key == key:
-                    return li.percent
-        # fallback: first non-session limit
-        for li in data.limits:
-            if li.key != "five_hour":
-                return li.percent
-        return None
+        """Worst-case weekly utilization across all known weekly buckets.
+
+        On Max plans the API exposes multiple model-specific weekly buckets
+        (e.g. seven_day_opus + seven_day_sonnet). Returning just the first one
+        could under-report; we surface the most-used bucket instead.
+        """
+        weekly_percents = [
+            li.percent for li in data.limits
+            if li.key in _WEEKLY_KEYS
+        ]
+        if weekly_percents:
+            return max(weekly_percents)
+        # Fallback: worst non-session bucket (covers any future weekly codename)
+        non_session = [li.percent for li in data.limits if li.key != "five_hour"]
+        return max(non_session) if non_session else None
 
     def _minimize(self) -> None:
         """Hide the widget — restore via tray icon left-click."""
