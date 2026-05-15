@@ -428,7 +428,7 @@ class Widget:
             short = "Session expired — open claude.ai in Firefox"
         elif "403" in lc or "cloudflare" in lc:
             short = "Blocked by Cloudflare — visit claude.ai in Firefox"
-        elif "cookie" in lc or "firefox" in lc:
+        elif "cookie" in lc or "firefox" in lc or "log in" in lc:
             short = "Log in to claude.ai in Firefox first"
         elif "429" in lc or "rate" in lc:
             short = "Rate limited — waiting for next poll"

@@ -43,7 +43,7 @@ def main() -> None:
         config = Config.load()
     except Exception as exc:
         _show_error_dialog(
-            "Claude Usage Monitor — Startup Error",
+            "Claude Usage Tracker — Startup Error",
             f"Failed to load configuration:\n\n{exc}",
         )
         sys.exit(1)
@@ -58,7 +58,7 @@ def main() -> None:
     except Exception as exc:
         logging.exception("Fatal error — application will exit.")
         _show_error_dialog(
-            "Claude Usage Monitor — Fatal Error",
+            "Claude Usage Tracker — Fatal Error",
             f"The application crashed and must close.\n\n"
             f"{exc}\n\n"
             f"Full details in the log file:\n{log_file}",

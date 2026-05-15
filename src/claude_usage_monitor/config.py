@@ -29,9 +29,9 @@ def log_file_path() -> Path:
 
 @dataclass
 class Config:
-    poll_interval_seconds: int = 30           # 30 seconds
+    poll_interval_seconds: int = 30
     notification_thresholds: list[int] = field(default_factory=lambda: [80, 95])
-    firefox_profile_path: str = ""            # empty = auto-detect
+    firefox_profile_path: str = ""
     log_level: str = "WARNING"
 
     # Internal: not written to TOML
@@ -71,6 +71,5 @@ class Config:
 
     @property
     def firefox_profile(self) -> Path | None:
-        """Return the override profile path, or None to trigger auto-detect."""
         p = self.firefox_profile_path.strip()
         return Path(p) if p else None

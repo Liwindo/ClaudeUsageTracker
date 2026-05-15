@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Claude Usage Monitor - Build
+title Claude Usage Tracker - Build
 
 echo ============================================================
-echo   Claude Usage Monitor - EXE Build
+echo   Claude Usage Tracker - EXE Build
 echo ============================================================
 echo.
 echo   Directory : %CD%
@@ -37,24 +37,24 @@ for /f "tokens=*" %%v in ('.venv\Scripts\pyinstaller.exe --version 2^>nul') do e
 echo.
 
 :: ── Step 2: Build EXE ─────────────────────────────────────────────────────────
-if exist dist\ClaudeUsageMonitor.exe (
+if exist dist\ClaudeUsageTracker.exe (
     echo   Removing old EXE...
-    del /q dist\ClaudeUsageMonitor.exe
+    del /q dist\ClaudeUsageTracker.exe
 )
 
 echo [2/2] Building EXE...
 echo   ^(First build ~30s  ^|  Rebuild with cache ~10s^)
 echo.
-.venv\Scripts\pyinstaller.exe ClaudeUsageMonitor.spec
+.venv\Scripts\pyinstaller.exe ClaudeUsageTracker.spec
 set BUILD_ERR=%errorlevel%
 
 echo.
 if %BUILD_ERR% neq 0 (
     echo   ERROR: PyInstaller failed ^(exit code %BUILD_ERR%^).
     echo.
-    if exist "build\ClaudeUsageMonitor\warn-ClaudeUsageMonitor.txt" (
+    if exist "build\ClaudeUsageTracker\warn-ClaudeUsageTracker.txt" (
         echo   --- PyInstaller warnings ^(last 20 lines^) ---
-        powershell -NoProfile -Command "Get-Content 'build\ClaudeUsageMonitor\warn-ClaudeUsageMonitor.txt' | Select-Object -Last 20"
+        powershell -NoProfile -Command "Get-Content 'build\ClaudeUsageTracker\warn-ClaudeUsageTracker.txt' | Select-Object -Last 20"
         echo   ---
         echo.
     )
@@ -65,17 +65,17 @@ if %BUILD_ERR% neq 0 (
     pause & exit /b %BUILD_ERR%
 )
 
-if not exist dist\ClaudeUsageMonitor.exe (
+if not exist dist\ClaudeUsageTracker.exe (
     echo   ERROR: PyInstaller reported success but the EXE was not created.
     echo   Check the output above for clues.
     echo.
     pause & exit /b 1
 )
 
-for %%F in (dist\ClaudeUsageMonitor.exe) do set EXE_SIZE=%%~zF
+for %%F in (dist\ClaudeUsageTracker.exe) do set EXE_SIZE=%%~zF
 set /a EXE_MB=%EXE_SIZE% / 1048576
 
 echo ============================================================
-echo   Done:  dist\ClaudeUsageMonitor.exe  ^(%EXE_MB% MB^)
+echo   Done:  dist\ClaudeUsageTracker.exe  ^(%EXE_MB% MB^)
 echo ============================================================
 pause

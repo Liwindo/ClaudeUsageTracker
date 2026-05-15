@@ -20,7 +20,7 @@ def _notify(title: str, message: str) -> None:
         notification.notify(
             title=title,
             message=message,
-            app_name="Claude Usage Monitor",
+            app_name="Claude Usage Tracker",
             timeout=8,
         )
     except Exception as exc:

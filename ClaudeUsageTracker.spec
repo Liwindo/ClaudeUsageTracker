@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ClaudeUsageMonitor',
+    name='ClaudeUsageTracker',
     icon='src/claude_usage_monitor/assets/logo.ico',
     debug=False,
     bootloader_ignore_signals=False,
