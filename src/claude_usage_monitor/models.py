@@ -59,8 +59,9 @@ class LimitInfo:
     def _parse_utilization(cls, raw: Any) -> int:
         """Extract integer percent from the utilization field.
 
-        The API returns {"source": "46.0", "parsedValue": 46}.
-        Fall back to direct int/float if the schema ever changes.
+        As of 2026-05 the API returns a plain float already in 0–100 range
+        (e.g. 13.0 = 13 %).  Earlier responses used a dict with parsedValue/source;
+        that branch is kept for backwards compatibility.
         REVERSE-ENGINEERED: schema inferred from real response.
         """
         if isinstance(raw, dict):
@@ -71,9 +72,7 @@ class LimitInfo:
             if source is not None:
                 return int(float(source))
         if isinstance(raw, (int, float)):
-            # Flat float 0–1 (extension code expected this; keep as fallback)
-            val = float(raw)
-            return int(val * 100) if val <= 1.0 else int(val)
+            return int(float(raw))
         return 0
 
     @classmethod
