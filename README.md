@@ -6,6 +6,12 @@
 
 A lightweight Windows system-tray tool that shows your [claude.ai](https://claude.ai) usage limits at a glance — without opening a browser tab.
 
+## Why this exists
+
+The Claude desktop app doesn't surface usage limits anywhere in the chat interface. To check how much of your session or weekly quota is left, you have to leave the conversation, open a menu, and navigate to the usage page — interrupting your workflow every time.
+
+This tool puts the information where you can always see it: a colour-coded tray icon and an optional floating widget, updated automatically in the background.
+
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints that Anthropic has not publicly documented. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
 ## Quick start
