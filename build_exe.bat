@@ -11,7 +11,7 @@ echo   Directory : %CD%
 for /f "tokens=*" %%v in ('uv --version 2^>nul') do echo   uv        : %%v
 echo.
 
-:: ── Step 1: Install all dependencies (including PyInstaller) ─────────────────
+REM --- Step 1: Install all dependencies (including PyInstaller) ---
 echo [1/2] Installing dependencies...
 uv sync --extra dev
 if errorlevel 1 (
@@ -36,7 +36,7 @@ if not exist ".venv\Scripts\pyinstaller.exe" (
 for /f "tokens=*" %%v in ('.venv\Scripts\pyinstaller.exe --version 2^>nul') do echo   PyInstaller %%v - OK.
 echo.
 
-:: ── Step 2: Build EXE ─────────────────────────────────────────────────────────
+REM --- Step 2: Build EXE ---
 if exist dist\ClaudeUsageTracker.exe (
     echo   Removing old EXE...
     del /q dist\ClaudeUsageTracker.exe
