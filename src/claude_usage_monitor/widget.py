@@ -287,6 +287,7 @@ class Widget:
         self._last_data: Optional[UsageData] = None
         self._last_error: Optional[str] = None
         self._tooltip_win: Optional[tk.Toplevel] = None
+        self._minimized: bool = False
 
     # ── Public API (thread-safe) ──────────────────────────────────────────────
 
@@ -307,7 +308,8 @@ class Widget:
 
         _apply_round_corners(root)
 
-        root.deiconify()
+        if not self._minimized:
+            root.deiconify()
         root.mainloop()
 
     def stop(self) -> None:
@@ -317,8 +319,12 @@ class Widget:
     def restore(self) -> None:
         """Show the widget if it was hidden."""
         if self._root:
-            self._root.after(0, self._root.deiconify)
-            self._root.after(0, lambda: self._root.attributes("-topmost", True))
+            def _do():
+                self._root.deiconify()
+                self._root.attributes("-topmost", True)
+                self._minimized = False
+                self._save_position()
+            self._root.after(0, _do)
 
     def toggle(self) -> None:
         """Show the widget if hidden, hide it if visible."""
@@ -327,8 +333,11 @@ class Widget:
                 if self._root.state() == "withdrawn":
                     self._root.deiconify()
                     self._root.attributes("-topmost", True)
+                    self._minimized = False
                 else:
                     self._root.withdraw()
+                    self._minimized = True
+                self._save_position()
             self._root.after(0, _do)
 
     def update(self, data: UsageData) -> None:
@@ -638,6 +647,7 @@ class Widget:
                 x, y = int(pos["x"]), int(pos["y"])
                 w = int(pos.get("w", _W))
                 h = int(pos.get("h", 0))
+                self._minimized = bool(pos.get("minimized", False))
             except Exception:
                 pass
         root.update_idletasks()
@@ -650,12 +660,29 @@ class Widget:
         if not self._root:
             return
         try:
+            # winfo_x/y return 0 while the window is withdrawn; fall back to the
+            # last persisted coords so a save during minimized state doesn't
+            # snap the widget to (0, 0) on next launch.
+            if self._minimized and _POS_FILE.exists():
+                try:
+                    prev = json.loads(_POS_FILE.read_text())
+                    x = int(prev.get("x", self._root.winfo_x()))
+                    y = int(prev.get("y", self._root.winfo_y()))
+                    w = int(prev.get("w", self._root.winfo_width()))
+                    h = int(prev.get("h", self._root.winfo_height()))
+                except Exception:
+                    x, y = self._root.winfo_x(), self._root.winfo_y()
+                    w, h = self._root.winfo_width(), self._root.winfo_height()
+            else:
+                x, y = self._root.winfo_x(), self._root.winfo_y()
+                w, h = self._root.winfo_width(), self._root.winfo_height()
             _POS_FILE.parent.mkdir(parents=True, exist_ok=True)
             _POS_FILE.write_text(json.dumps({
-                "x": self._root.winfo_x(),
-                "y": self._root.winfo_y(),
-                "w": self._root.winfo_width(),
-                "h": self._root.winfo_height(),
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
+                "minimized": self._minimized,
             }))
         except Exception:
             pass
@@ -745,3 +772,5 @@ class Widget:
         """Hide the widget — restore via tray icon left-click."""
         if self._root:
             self._root.withdraw()
+            self._minimized = True
+            self._save_position()

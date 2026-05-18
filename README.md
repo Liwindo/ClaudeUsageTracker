@@ -87,7 +87,7 @@ An always-on-top mini-panel shows:
 - Hover to reveal **refresh (⟳)**, **minimise (−)**, and **quit (×)** buttons
 - Drag anywhere to reposition; drag the bottom-right grip to resize
 - Right-click for a context menu
-- Position and size are remembered between sessions
+- Position, size, and minimised state are remembered between sessions — if the widget was hidden when you last quit, it stays hidden in the tray on next launch
 
 **Error display** — when a poll fails, the footer shows a short inline message (e.g. *"Session expired — open claude.ai in Firefox"*). For unexpected errors it shows *"Error — hover here for details"*; hovering over that text reveals a tooltip with the full error message and the path to the log file.
 
