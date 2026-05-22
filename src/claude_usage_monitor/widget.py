@@ -12,8 +12,10 @@ from __future__ import annotations
 import ctypes
 import json
 import tkinter as tk
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
+from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -60,6 +62,32 @@ _WEEKLY_KEYS = [
     "seven_day", "seven_day_sonnet", "seven_day_opus",
     "seven_day_omelette", "seven_day_cowork",
 ]
+
+# Anthropic's published peak hours: weekdays 05:00–11:00 Pacific Time.
+# Defined in PT so DST shifts (and the asymmetric US-vs-rest-of-world DST
+# transition weeks) convert correctly to whatever local zone the OS reports.
+_PEAK_TZ = ZoneInfo("America/Los_Angeles")
+_PEAK_PT_START = 5
+_PEAK_PT_END = 11  # exclusive
+
+
+def _peak_hour_window_local() -> Optional[tuple[int, int]]:
+    """If now lies inside Anthropic's peak window, return its (start, end) hour
+    in the OS's local zone for display. Returns None otherwise.
+
+    The local zone is read from the OS at each call via the no-arg form of
+    `astimezone()`, so the displayed hours adapt automatically to wherever the
+    user runs the tool — no hard-coded Europe/Berlin assumption.
+    """
+    now_pt = datetime.now(_PEAK_TZ)
+    if now_pt.weekday() >= 5:  # Sat/Sun
+        return None
+    if not (_PEAK_PT_START <= now_pt.hour < _PEAK_PT_END):
+        return None
+    base = now_pt.replace(minute=0, second=0, microsecond=0)
+    start_local = base.replace(hour=_PEAK_PT_START).astimezone()
+    end_local = base.replace(hour=_PEAK_PT_END).astimezone()
+    return start_local.hour, end_local.hour
 
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
@@ -268,6 +296,10 @@ class Widget:
         self._dot: Optional[tk.Label] = None
         self._div: Optional[tk.Label] = None
         self._lbl_ft: Optional[tk.Label] = None
+        self._peak_banner: Optional[tk.Label] = None
+        self._session_row: Optional[tk.Frame] = None
+        self._peak_visible: bool = False
+        self._extra_for_banner: int = 0  # height delta added by the banner
         self._buttons: list[tk.Button] = []
 
         self._dragging = False
@@ -304,12 +336,23 @@ class Widget:
         self._build_ui(root)
         self._restore_position(root)
         root.update_idletasks()
-        self._min_h = root.winfo_height()
+        # Use the natural required height as the floor — winfo_height() could
+        # be smaller if the user had previously over-shrunk the widget via the
+        # resize grip, which would later clip the footer (and its buttons).
+        self._min_h = max(root.winfo_height(), root.winfo_reqheight())
 
         _apply_round_corners(root)
 
         if not self._minimized:
             root.deiconify()
+        # Evaluate peak window only after `_min_h` is captured from the natural
+        # (banner-free) layout, so shrink-back at end-of-peak knows the floor.
+        # Defer via after() so the initial deiconify + <Configure> + SetWindowRgn
+        # pipeline has fully settled before we attempt the banner's bottom-anchored
+        # geometry shift. Running grow synchronously here races with Windows'
+        # post-map position handling, which reverts the y-shift back to the
+        # restored y and leaves the bottom edge floating downward by `delta`.
+        root.after(0, self._tick_peak_banner)
         root.mainloop()
 
     def stop(self) -> None:
@@ -323,6 +366,7 @@ class Widget:
                 self._root.deiconify()
                 self._root.attributes("-topmost", True)
                 self._minimized = False
+                self._refresh_peak_banner()  # catch any state change while hidden
                 self._save_position()
             self._root.after(0, _do)
 
@@ -334,6 +378,7 @@ class Widget:
                     self._root.deiconify()
                     self._root.attributes("-topmost", True)
                     self._minimized = False
+                    self._refresh_peak_banner()
                 else:
                     self._root.withdraw()
                     self._minimized = True
@@ -367,9 +412,14 @@ class Widget:
             font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
         ).pack(fill="x", pady=(0, 10))
 
-        self._var_s, self._lbl_s, self._bar_s = self._metric_row(card, "Session")
+        # Peak-hour banner — packed dynamically only while the window is active.
+        self._peak_banner = tk.Label(
+            card, text="", font=_FONT_LBL, bg=_BG, fg=_WARN, anchor="w",
+        )
+
+        self._var_s, self._lbl_s, self._bar_s, self._session_row = self._metric_row(card, "Session")
         tk.Frame(card, bg=_BG, height=10).pack()
-        self._var_w, self._lbl_w, self._bar_w = self._metric_row(card, "Weekly")
+        self._var_w, self._lbl_w, self._bar_w, _ = self._metric_row(card, "Weekly")
 
         # Gradient divider (fades at the edges) — sits in its own 1px tall band
         div_band = tk.Frame(card, bg=_BG, height=1)
@@ -420,9 +470,105 @@ class Widget:
 
         self._poll_hover()
 
+    def _tick_peak_banner(self) -> None:
+        """Re-check the peak-hour state and re-schedule. Runs once per minute.
+
+        Wrapped in try/finally so that an exception during the refresh cannot
+        kill the tick chain (which previously also broke the hover poll on the
+        same event loop and caused buttons to appear frozen).
+        """
+        if not self._root:
+            return
+        try:
+            self._refresh_peak_banner()
+        finally:
+            if self._root:
+                self._root.after(60_000, self._tick_peak_banner)
+
+    def _refresh_peak_banner(self) -> None:
+        """Apply the current peak-hour state to the banner. Idempotent."""
+        if not self._root or self._peak_banner is None or self._minimized:
+            return
+        window = _peak_hour_window_local()
+        if window is None:
+            if self._peak_visible:
+                self._peak_banner.pack_forget()
+                self._peak_visible = False
+                self._shrink_for_banner()
+        else:
+            start, end = window
+            text = f"⚠ Peak hour ({start:02d}:00 – {end:02d}:00) - reduced token limit"
+            self._peak_banner.configure(text=text)
+            if not self._peak_visible and self._session_row is not None:
+                self._peak_banner.pack(
+                    fill="x", pady=(0, 8), before=self._session_row,
+                )
+                self._peak_visible = True
+                self._grow_for_banner()
+
+    def _grow_for_banner(self) -> None:
+        """Add room for the banner by moving the top edge up — bottom stays put."""
+        if not self._root:
+            return
+        self._root.update_idletasks()  # let the just-packed banner contribute to reqheight
+        cur_x = self._root.winfo_x()
+        cur_y = self._root.winfo_y()
+        cur_w = self._root.winfo_width()
+        cur_h = self._root.winfo_height()
+        req_h = self._root.winfo_reqheight()
+        if req_h > cur_h:
+            delta = req_h - cur_h
+            self._extra_for_banner = delta
+            # Anchor the bottom edge: keep (y + h) constant by moving y up.
+            self._root.geometry(f"{cur_w}x{req_h}+{cur_x}+{cur_y - delta}")
+            # IMPORTANT: do NOT call update() here — calling it synchronously
+            # from a Tk after()-callback re-enters the event loop and, on
+            # Win10, deadlocks against the <Configure> + SetWindowRgn cascade
+            # that this geometry change triggers. Defer save + re-clip to the
+            # next idle slot, which fires after the geometry has been honored.
+            self._root.after_idle(self._post_banner_change)
+
+    def _shrink_for_banner(self) -> None:
+        """Reverse `_grow_for_banner`: drop the top edge back down by `delta`."""
+        if not self._root or self._extra_for_banner <= 0:
+            return
+        self._root.update_idletasks()  # let pack_forget flush so reqheight updates
+        delta = self._extra_for_banner
+        cur_x = self._root.winfo_x()
+        cur_y = self._root.winfo_y()
+        cur_w = self._root.winfo_width()
+        cur_h = self._root.winfo_height()
+        # Post-pack_forget reqheight = the natural banner-free content height.
+        # Floor at it so the footer (with its buttons) never gets clipped, even
+        # if the saved `_min_h` came from a previously over-shrunk widget.
+        natural_h = self._root.winfo_reqheight()
+        new_h = max(self._min_h, natural_h, cur_h - delta)
+        real_delta = cur_h - new_h
+        self._extra_for_banner = 0
+        # Mirror grow: bottom edge stays where it was, top edge drops by delta.
+        self._root.geometry(f"{cur_w}x{new_h}+{cur_x}+{cur_y + real_delta}")
+        self._root.after_idle(self._post_banner_change)
+
+    def _post_banner_change(self) -> None:
+        """Persist + re-evaluate hover after a banner-driven resize.
+
+        `_apply_round_corners` is intentionally NOT called here — the size
+        change has already triggered `<Configure>` which re-clips the region.
+        Calling it again would invalidate the window region a second time and
+        force a Win10 redraw that briefly fights with the fade animation.
+        """
+        if not self._root:
+            return
+        self._save_position()
+        # Re-evaluate hover against the new geometry RIGHT NOW so the buttons
+        # reflect their correct state immediately, rather than waiting up to
+        # 80 ms for the next `_poll_hover` tick (which can read intermittently
+        # stale winfo_root* values during the transition).
+        self._eval_hover()
+
     def _metric_row(
         self, parent: tk.Frame, label: str
-    ) -> tuple[tk.StringVar, tk.Label, tk.Label]:
+    ) -> tuple[tk.StringVar, tk.Label, tk.Label, tk.Frame]:
         row = tk.Frame(parent, bg=_BG)
         row.pack(fill="x")
 
@@ -441,7 +587,7 @@ class Widget:
         bar = tk.Label(track, bg=_BG, bd=0, highlightthickness=0)
         bar.place(x=0, y=0, relwidth=1, relheight=1)
 
-        return var, lbl, bar
+        return var, lbl, bar, row
 
     def _build_buttons(self, foot: tk.Frame) -> None:
         frame = tk.Frame(foot, bg=_BG)
@@ -519,20 +665,26 @@ class Widget:
 
     # ── Hover / button fade ───────────────────────────────────────────────────
 
-    def _poll_hover(self) -> None:
+    def _eval_hover(self) -> None:
+        """Set the fade target from the current mouse vs widget bounds. Idempotent."""
         if not self._root:
             return
         x, y = self._root.winfo_pointerxy()
         rx, ry = self._root.winfo_rootx(), self._root.winfo_rooty()
         rw, rh = self._root.winfo_width(), self._root.winfo_height()
         inside = rx <= x < rx + rw and ry <= y < ry + rh
-
         target = 6 if inside else 0
         if target != self._btn_fade_target:
             self._btn_fade_target = target
             self._start_button_fade()
 
+    def _poll_hover(self) -> None:
+        if not self._root:
+            return
+        self._eval_hover()
+
         if self._last_error and self._lbl_ft:
+            x, y = self._root.winfo_pointerxy()
             lx, ly = self._lbl_ft.winfo_rootx(), self._lbl_ft.winfo_rooty()
             lw, lh = self._lbl_ft.winfo_width(), self._lbl_ft.winfo_height()
             if lx <= x < lx + lw and ly <= y < ly + lh:
@@ -603,7 +755,8 @@ class Widget:
         if not self._resizing:
             return
         w = max(self._min_w, self._resize_start_w + (e.x_root - self._resize_start_x))
-        h = max(self._min_h, self._resize_start_h + (e.y_root - self._resize_start_y))
+        floor = self._min_h + self._extra_for_banner
+        h = max(floor, self._resize_start_h + (e.y_root - self._resize_start_y))
         self._root.geometry(f"{w}x{h}")
 
     def _resize_end(self, _e=None) -> None:
@@ -651,10 +804,13 @@ class Widget:
             except Exception:
                 pass
         root.update_idletasks()
+        # Never start below the natural content height — otherwise the footer
+        # (buttons) is clipped from the first frame onward.
+        req_h = root.winfo_reqheight()
         if h > 0:
-            root.geometry(f"{w}x{h}+{x}+{y}")
+            root.geometry(f"{w}x{max(h, req_h)}+{x}+{y}")
         else:
-            root.geometry(f"{w}x{root.winfo_reqheight()}+{x}+{y}")
+            root.geometry(f"{w}x{req_h}+{x}+{y}")
 
     def _save_position(self) -> None:
         if not self._root:
@@ -676,6 +832,14 @@ class Widget:
             else:
                 x, y = self._root.winfo_x(), self._root.winfo_y()
                 w, h = self._root.winfo_width(), self._root.winfo_height()
+                # Strip the banner's contribution from BOTH y and h so the
+                # persisted frame describes the banner-free layout. The banner
+                # pushes the top up by `extra` (bottom anchored), so the
+                # natural top is `y + extra` and the natural height is
+                # `h - extra` — together they preserve the bottom edge.
+                if self._peak_visible and self._extra_for_banner > 0:
+                    y = y + self._extra_for_banner
+                    h = max(self._min_h, h - self._extra_for_banner)
             _POS_FILE.parent.mkdir(parents=True, exist_ok=True)
             _POS_FILE.write_text(json.dumps({
                 "x": x,
@@ -704,6 +868,10 @@ class Widget:
         li = next((li for li in data.limits if li.key == "five_hour"), None)
         self._var_ft.set(f"reset {li.reset_countdown}" if li else "active")
         self._set_dot_color(_reset_color(li))
+        # Re-evaluate the peak-hour banner on every poll (manual or scheduled)
+        # so a clock change is reflected within the poll interval, not the
+        # 60 s banner tick.
+        self._refresh_peak_banner()
 
     def _apply_error(self, message: str) -> None:
         if self._var_ft is None or self._dot is None:
@@ -727,6 +895,7 @@ class Widget:
             short = "Error — hover here for details"
         self._var_ft.set(short)
         self._set_dot_color(_ALERT)
+        self._refresh_peak_banner()
 
     def _set_metric(
         self,

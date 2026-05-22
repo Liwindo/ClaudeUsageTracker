@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude-usage-monitor"
-version = "1.1.0"
+version = "1.2.0"
 description = "System-tray tool that monitors claude.ai usage limits via browser cookies"
 readme = "README.md"
 license = { text = "MIT" }
@@ -15,6 +15,7 @@ dependencies = [
     "Pillow>=12.2.0",
     "plyer>=2.1",
     "tomli-w>=1.2.0",
+    "tzdata>=2026.2",
 ]
 
 [project.scripts]
