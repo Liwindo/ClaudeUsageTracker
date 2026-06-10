@@ -101,6 +101,10 @@ The config file is created automatically on first run at:
 %APPDATA%\claude-usage-monitor\config.toml
 ```
 
+It always contains **every** available option with its default value. When an
+update introduces a new option, it is appended to your existing file
+automatically on the next start — you only ever change values, never add keys.
+
 Available settings:
 
 ```toml
