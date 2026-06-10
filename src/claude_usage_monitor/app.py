@@ -9,12 +9,15 @@ Threading model:
 from __future__ import annotations
 
 import logging
+import threading
+import time
 
 from .config import Config
 from .models import UsageData
 from .notifications import NotificationManager
 from .poller import Poller
 from .tray import TrayIcon
+from .update_check import check_for_update
 from .widget import Widget
 
 logger = logging.getLogger(__name__)
@@ -46,6 +49,10 @@ class App:
         """Start everything. Blocks until the user quits."""
         self._poller.start()
         self._tray.run()         # non-blocking — pystray manages its own thread
+        if self._config.update_check:
+            threading.Thread(
+                target=self._check_updates, daemon=True, name="update-check"
+            ).start()
         self._widget.start()     # blocks main thread — tkinter requires the main thread on Windows
 
     def _on_data(self, data: UsageData) -> None:
@@ -59,6 +66,19 @@ class App:
 
     def _on_refresh_requested(self) -> None:
         self._poller.refresh_now()
+
+    def _check_updates(self) -> None:
+        """One-shot background check; shows the update dialog if needed.
+
+        Delayed a few seconds so the GitHub request never competes with the
+        UI startup and the dialog appears after the widget is on screen.
+        Runs on a daemon thread — Widget.notify_update handles the cross-
+        thread hand-off and tolerates a quit happening in the meantime.
+        """
+        time.sleep(3)
+        info = check_for_update()
+        if info:
+            self._widget.notify_update(info.latest_version, info.url)
 
     def _quit(self) -> None:
         logger.info("Quitting.")

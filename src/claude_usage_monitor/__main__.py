@@ -32,7 +32,12 @@ def _setup_logging(config: Config) -> Path:
     ))
 
     root = logging.getLogger()
-    root.setLevel(getattr(logging, config.log_level, logging.WARNING))
+    # getattr(logging, "warning") would return the *function* logging.warning,
+    # which setLevel() rejects with TypeError — normalise and type-check.
+    level = getattr(logging, config.log_level.upper(), None)
+    if not isinstance(level, int):
+        level = logging.WARNING
+    root.setLevel(level)
     root.addHandler(handler)
 
     return log_file

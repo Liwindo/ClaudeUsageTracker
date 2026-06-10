@@ -6,7 +6,15 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('src/claude_usage_monitor', 'claude_usage_monitor')],
-    hiddenimports=['pystray._win32', 'PIL._tkinter_finder'],
+    # plyer loads its platform backend dynamically (plyer.platforms.win.*),
+    # which PyInstaller cannot trace — without the explicit hiddenimport the
+    # frozen EXE logs "No usable implementation found!" and desktop
+    # notifications silently do nothing.
+    hiddenimports=[
+        'pystray._win32',
+        'PIL._tkinter_finder',
+        'plyer.platforms.win.notification',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

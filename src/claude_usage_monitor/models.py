@@ -81,6 +81,10 @@ class LimitInfo:
         percent = cls._parse_utilization(data.get("utilization", 0))
         try:
             resets_at = datetime.fromisoformat(data["resets_at"])
+            if resets_at.tzinfo is None:
+                # A naive datetime would make resets_in_seconds raise TypeError
+                # (aware minus naive) on every countdown render.
+                resets_at = resets_at.replace(tzinfo=timezone.utc)
         except (KeyError, TypeError, ValueError):
             resets_at = datetime.now(tz=timezone.utc)
         return cls(key=key, label=label, percent=percent, resets_at=resets_at)
@@ -102,13 +106,12 @@ class UsageData:
     ) -> UsageData:
         """Parse the raw /usage JSON into a UsageData instance.
 
-        Only non-null buckets that appear in _CODENAME_LABELS are included.
-        Unknown non-null keys are included with a generic label so nothing
-        silently disappears if Anthropic adds new buckets.
+        Every non-null dict bucket is included — unknown keys get a generic
+        "Unknown (…)" label so nothing silently disappears if Anthropic adds
+        new buckets. Only the non-bucket key `extra_usage` is skipped.
         REVERSE-ENGINEERED: schema inferred from real response.
         """
         limits: list[LimitInfo] = []
-        known_keys = set(_CODENAME_LABELS.keys()) | {"extra_usage"}
 
         for key, value in payload.items():
             if key == "extra_usage":

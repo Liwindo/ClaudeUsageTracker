@@ -10,6 +10,7 @@ journal mode allows concurrent reads without needing a file copy.
 from __future__ import annotations
 
 import configparser
+import os
 import re
 import sqlite3
 import time
@@ -18,7 +19,14 @@ from pathlib import Path
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
-_FIREFOX_APPDATA = Path.home() / "AppData" / "Roaming" / "Mozilla" / "Firefox"
+def _appdata_roaming() -> Path:
+    # Respect %APPDATA% — profiles redirected via group policy don't live
+    # under Path.home().
+    appdata = os.environ.get("APPDATA")
+    return Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
+
+
+_FIREFOX_APPDATA = _appdata_roaming() / "Mozilla" / "Firefox"
 _CLAUDE_HOST = "claude.ai"
 
 
@@ -38,20 +46,21 @@ def _find_default_profile() -> Path:
     cfg = configparser.ConfigParser()
     cfg.read(profiles_ini, encoding="utf-8")
 
-    # Prefer the profile marked as Default=1 in an [Install…] section,
-    # then fall back to the first profile with Default=1, then any profile.
-    install_default: str | None = None
+    # Prefer the profile named in an [Install…] section (the one the default
+    # Firefox install actually uses), then the first [Profile*] section with
+    # Default=1, then any existing profile.
     for section in cfg.sections():
-        if section.startswith("Install"):
-            install_default = cfg[section].get("Default")
-            break
-
-    if install_default:
+        if not section.startswith("Install"):
+            continue
+        install_default = cfg[section].get("Default")
+        if not install_default:
+            continue
         candidate = _FIREFOX_APPDATA / install_default
         if candidate.is_dir():
             return candidate
 
-    # Fallback: scan [Profile*] sections
+    # Fallback: scan [Profile*] sections, honouring the Default=1 flag.
+    fallback: Path | None = None
     for section in cfg.sections():
         if not section.startswith("Profile"):
             continue
@@ -61,8 +70,15 @@ def _find_default_profile() -> Path:
         profile_path = (
             _FIREFOX_APPDATA / path_str if relative else Path(path_str)
         )
-        if profile_path.is_dir():
+        if not profile_path.is_dir():
+            continue
+        if profile_cfg.get("Default") == "1":
             return profile_path
+        if fallback is None:
+            fallback = profile_path
+
+    if fallback is not None:
+        return fallback
 
     raise FirefoxCookieError("No usable Firefox profile directory found.")
 
@@ -76,19 +92,38 @@ def _query_cookies(db_path: Path, host: str) -> dict[str, str]:
     `notclaude.ai` or `evil-claude.ai.example.com`.
     """
     now_seconds = int(time.time())
+    params = (host, f".{host}", f"%.{host}", now_seconds)
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
         try:
-            cur = conn.execute(
-                """
-                SELECT name, value
-                FROM   moz_cookies
-                WHERE  (host = ? OR host = ? OR host LIKE ?)
-                  AND  expiry > ?
-                """,
-                (host, f".{host}", f"%.{host}", now_seconds),
-            )
-            return {row[0]: row[1] for row in cur.fetchall()}
+            # Firefox containers store separate rows per container (column
+            # originAttributes). Sort so default-container rows ('') come last
+            # and win the dict merge — otherwise a container session could
+            # shadow the regular login.
+            try:
+                cur = conn.execute(
+                    """
+                    SELECT name, value, originAttributes
+                    FROM   moz_cookies
+                    WHERE  (host = ? OR host = ? OR host LIKE ?)
+                      AND  expiry > ?
+                    """,
+                    params,
+                )
+                rows = sorted(cur.fetchall(), key=lambda r: r[2] == "")
+            except sqlite3.OperationalError:
+                # Very old schema without originAttributes.
+                cur = conn.execute(
+                    """
+                    SELECT name, value
+                    FROM   moz_cookies
+                    WHERE  (host = ? OR host = ? OR host LIKE ?)
+                      AND  expiry > ?
+                    """,
+                    params,
+                )
+                rows = cur.fetchall()
+            return {row[0]: row[1] for row in rows}
         finally:
             conn.close()
     except sqlite3.Error as exc:

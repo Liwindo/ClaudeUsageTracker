@@ -26,6 +26,7 @@ _tier_cache: dict[str, tuple[str, float]] = {}
 
 # Must match the browser that owns the Firefox session, otherwise Cloudflare
 # may reject the request even with a valid cf_clearance cookie.
+# Users can override this without a rebuild via `user_agent` in config.toml.
 # REVERSE-ENGINEERED: update if you see systematic 403s after browser updates.
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) "
@@ -53,8 +54,15 @@ class SessionExpiredError(ClaudeClientError):
     """Raised when Cloudflare or claude.ai rejects the session (401/403)."""
 
 
-def _make_headers(cookie_header: str) -> dict[str, str]:
-    return {**_BASE_HEADERS, "Cookie": cookie_header}
+class RateLimitedError(ClaudeClientError):
+    """Raised on HTTP 429 — the poller backs off exponentially on this."""
+
+
+def _make_headers(cookie_header: str, user_agent: str | None = None) -> dict[str, str]:
+    headers = {**_BASE_HEADERS, "Cookie": cookie_header}
+    if user_agent:
+        headers["User-Agent"] = user_agent
+    return headers
 
 
 def _check_response(resp: httpx.Response, endpoint: str) -> dict[str, Any]:
@@ -66,7 +74,7 @@ def _check_response(resp: httpx.Response, endpoint: str) -> dict[str, Any]:
             "Open claude.ai in Firefox to refresh the session."
         )
     if resp.status_code == 429:
-        raise ClaudeClientError(
+        raise RateLimitedError(
             f"{endpoint} returned 429 (rate limited). Backing off."
         )
     if not resp.is_success:
@@ -86,6 +94,7 @@ def fetch_subscription_tier(
     client: httpx.Client,
     org_id: str,
     cookie_header: str,
+    user_agent: str | None = None,
 ) -> str:
     """Fetch the user's subscription tier from the bootstrap endpoint.
 
@@ -95,7 +104,7 @@ def fetch_subscription_tier(
     url = f"{_BASE}/bootstrap/{org_id}/app_start?statsig_hashing_algorithm=djb2"
     logger.debug("GET %s", url)
     try:
-        resp = client.get(url, headers=_make_headers(cookie_header))
+        resp = client.get(url, headers=_make_headers(cookie_header, user_agent))
     except httpx.RequestError as exc:
         raise ClaudeClientError(f"Network error fetching bootstrap: {exc}") from exc
 
@@ -126,6 +135,7 @@ def fetch_usage(
     org_id: str,
     cookie_header: str,
     subscription_tier: str = "unknown",
+    user_agent: str | None = None,
 ) -> UsageData:
     """Fetch current usage limits from the internal /usage endpoint.
 
@@ -136,7 +146,7 @@ def fetch_usage(
     url = f"{_BASE}/organizations/{org_id}/usage"
     logger.debug("GET %s", url)
     try:
-        resp = client.get(url, headers=_make_headers(cookie_header))
+        resp = client.get(url, headers=_make_headers(cookie_header, user_agent))
     except httpx.RequestError as exc:
         raise ClaudeClientError(f"Network error fetching usage: {exc}") from exc
 
@@ -145,14 +155,19 @@ def fetch_usage(
     return UsageData.from_api_response(data, subscription_tier=subscription_tier)
 
 
-def _cached_tier(client: httpx.Client, org_id: str, cookie_header: str) -> str:
+def _cached_tier(
+    client: httpx.Client,
+    org_id: str,
+    cookie_header: str,
+    user_agent: str | None = None,
+) -> str:
     """Return the cached subscription tier or refetch if the entry is stale."""
     now = time.monotonic()
     cached = _tier_cache.get(org_id)
     if cached and (now - cached[1]) < _TIER_CACHE_SECONDS:
         return cached[0]
     try:
-        tier = fetch_subscription_tier(client, org_id, cookie_header)
+        tier = fetch_subscription_tier(client, org_id, cookie_header, user_agent)
     except ClaudeClientError as exc:
         logger.warning("Could not fetch subscription tier: %s", exc)
         # On failure keep any previous value rather than dropping to "unknown".
@@ -164,6 +179,7 @@ def _cached_tier(client: httpx.Client, org_id: str, cookie_header: str) -> str:
 def fetch_all(
     org_id: str,
     cookie_header: str,
+    user_agent: str | None = None,
 ) -> UsageData:
     """Single entry point: fetches tier + usage and returns a UsageData.
 
@@ -171,5 +187,8 @@ def fetch_all(
     to manage connection lifecycle.
     """
     with httpx.Client(timeout=_TIMEOUT, follow_redirects=False) as client:
-        tier = _cached_tier(client, org_id, cookie_header)
-        return fetch_usage(client, org_id, cookie_header, subscription_tier=tier)
+        tier = _cached_tier(client, org_id, cookie_header, user_agent)
+        return fetch_usage(
+            client, org_id, cookie_header,
+            subscription_tier=tier, user_agent=user_agent,
+        )
