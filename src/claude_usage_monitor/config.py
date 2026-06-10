@@ -5,6 +5,7 @@ Config file location: %APPDATA%\\claude-usage-monitor\\config.toml  (Windows)
 
 from __future__ import annotations
 
+import logging
 import os
 import tomllib
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 import tomli_w
+
+logger = logging.getLogger(__name__)
 
 
 def _config_dir() -> Path:
@@ -66,7 +69,7 @@ class Config:
         # otherwise raise TypeError on every threshold comparison at poll time.
         thresholds = [int(t) for t in data.get("notification_thresholds", [80, 95])]
 
-        return cls(
+        cfg = cls(
             poll_interval_seconds=interval,
             notification_thresholds=thresholds,
             firefox_profile_path=str(data.get("firefox_profile_path", "")),
@@ -76,10 +79,28 @@ class Config:
             _path=resolved,
         )
 
-    def save(self) -> None:
-        """Persist current config to TOML."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        data: dict[str, Any] = {
+        # Migrate config files from older versions: if any option is missing
+        # (i.e. it was added in a later release), rewrite the file with the
+        # full key set so new options show up with their default values and
+        # the user only ever has to change a value, never add a key.
+        # Best-effort — a read-only file must not prevent startup.
+        missing = set(cfg._to_dict()) - set(data)
+        if missing:
+            try:
+                cfg.save()
+                logger.info(
+                    "Config migrated: added missing option(s) %s with defaults.",
+                    ", ".join(sorted(missing)),
+                )
+            except OSError as exc:
+                logger.warning("Could not migrate config file: %s", exc)
+
+        return cfg
+
+    def _to_dict(self) -> dict[str, Any]:
+        """All persistable options. save() writes exactly this key set, and
+        load() uses it to detect options missing from older config files."""
+        return {
             "poll_interval_seconds": self.poll_interval_seconds,
             "notification_thresholds": self.notification_thresholds,
             "firefox_profile_path": self.firefox_profile_path,
@@ -87,8 +108,12 @@ class Config:
             "user_agent": self.user_agent,
             "update_check": self.update_check,
         }
+
+    def save(self) -> None:
+        """Persist current config to TOML."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "wb") as f:
-            tomli_w.dump(data, f)
+            tomli_w.dump(self._to_dict(), f)
 
     @property
     def firefox_profile(self) -> Path | None:
