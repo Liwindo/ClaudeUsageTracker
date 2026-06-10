@@ -44,10 +44,16 @@ class NotificationManager:
         self._thresholds = sorted(thresholds)
         # Set of (bucket_key, threshold) pairs that have already fired.
         self._fired: set[tuple[str, int]] = set()
+        # Last seen percent per bucket — used to tell a real reset (sharp drop
+        # between two polls) from a rolling window slowly declining.
+        self._last_percent: dict[str, int] = {}
 
     def process(self, data: UsageData) -> None:
         """Check data against thresholds and fire notifications as needed."""
         for li in data.limits:
+            prev = self._last_percent.get(li.key)
+            self._last_percent[li.key] = li.percent
+            rearmed = False
             for threshold in self._thresholds:
                 key = (li.key, threshold)
                 if li.percent >= threshold:
@@ -55,10 +61,27 @@ class NotificationManager:
                         self._fired.add(key)
                         self._fire_threshold(li.label, li.percent, threshold)
                 elif key in self._fired and li.percent < threshold - self._HYSTERESIS:
-                    # Meaningful drop below the hysteresis band: re-arm and
-                    # announce the reset. Stays armed until value re-crosses.
+                    # Meaningful drop below the hysteresis band: re-arm.
+                    # Stays armed until the value re-crosses the threshold.
                     self._fired.discard(key)
-                    self._fire_reset(li.label, li.percent)
+                    rearmed = True
+            # Announce at most once per bucket — a reset to 0% re-arms ALL
+            # fired thresholds in the same pass and would otherwise toast once
+            # per threshold. A slow decline re-arms silently: announcing
+            # "limit has reset" there would be wrong.
+            if rearmed and self._looks_like_reset(prev, li.percent):
+                self._fire_reset(li.label, li.percent)
+
+    @staticmethod
+    def _looks_like_reset(prev: int | None, current: int) -> bool:
+        """True if the drop looks like an actual limit reset.
+
+        A real reset collapses to ~0 within one poll interval; a rolling
+        window declines a few points per poll at most.
+        """
+        if current <= 5:
+            return True
+        return prev is not None and prev - current >= 25
 
     def _fire_threshold(self, label: str, percent: int, threshold: int) -> None:
         logger.info("Notification: %s reached %d%% (threshold %d%%)", label, percent, threshold)

@@ -38,6 +38,8 @@ Cookie values are read directly from the database file using a read-only SQLite 
 
 On each poll cycle the tool calls two endpoints: `/api/bootstrap/{org}/app_start` to determine the subscription tier (cached for one hour to halve the request volume) and `/api/organizations/{org}/usage` for the actual limits.
 
+**Update check** — once per app start (and only then), the tool asks the GitHub API whether a newer release exists. If so, a dialog appears with an **Open GitHub** button that takes you to the release page, and a **Cancel** button to dismiss it. The check never repeats while the app is running, fails silently when offline, and can be disabled entirely with `update_check = false` in the config.
+
 ## Why Firefox only?
 
 Chrome (and other Chromium-based browsers) introduced **App-Bound Encryption** in version 127 (July 2024). Cookie values are encrypted with a key that is cryptographically tied to the Chrome application itself — decryption requires Chrome's own elevation service and cannot be performed by any external process, regardless of permissions.
@@ -116,6 +118,17 @@ log_level = "WARNING"
 
 # Override the Firefox profile directory (leave empty for auto-detection).
 firefox_profile_path = ""
+
+# Override the User-Agent sent to claude.ai (leave empty for the built-in
+# default). Set this to your installed Firefox's User-Agent if Cloudflare
+# starts blocking requests after a browser update — find yours at
+# about:support → "User Agent".
+user_agent = ""
+
+# Check GitHub once per app start for a newer release. If one is found, a
+# dialog offers to open the release page (or cancel). Set to false to
+# disable the check entirely — no request is made to GitHub then.
+update_check = true
 ```
 
 ### Custom Firefox profile path
@@ -173,7 +186,7 @@ The `/usage` endpoint uses Anthropic's internal bucket names (e.g. `seven_day_om
 
 ## Privacy
 
-- No data leaves your machine except the HTTPS requests to `claude.ai` (which your browser already makes).
+- No data leaves your machine except the HTTPS requests to `claude.ai` (which your browser already makes) and, if `update_check` is enabled (the default), a single anonymous HTTPS request to `api.github.com` at startup to look up the latest release version. No cookies or usage data are sent to GitHub — set `update_check = false` to disable it.
 - Cookie values are read directly from the Firefox database without copying the file to disk.
 - Firefox cookies are stored unencrypted in the SQLite database; they are read into memory for the duration of each poll only and are never written to any other file.
 - No telemetry.
@@ -192,6 +205,7 @@ src/claude_usage_monitor/
 ├── tray.py              pystray icon + colour logic
 ├── widget.py            Persistent always-on-top tkinter widget
 ├── notifications.py     Desktop notification throttling
+├── update_check.py      One-shot GitHub release check at startup
 └── assets/              Application icons (logo.png, logo.ico)
 ```
 

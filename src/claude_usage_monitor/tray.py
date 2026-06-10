@@ -13,6 +13,15 @@ from .models import UsageData
 
 _ICON_SIZE = 64
 
+# NOTIFYICONDATAW.szTip is a fixed WCHAR[128] buffer (incl. NUL terminator);
+# pystray passes the title through unclipped and ctypes raises ValueError for
+# anything longer — which would make every poll cycle fail.
+_MAX_TIP = 127
+
+
+def _clip_tip(text: str) -> str:
+    return text if len(text) <= _MAX_TIP else text[: _MAX_TIP - 1] + "…"
+
 _COLORS = {
     "green":  "#22c55e",
     "yellow": "#eab308",
@@ -117,11 +126,15 @@ class TrayIcon:
 
     def update(self, data: UsageData) -> None:
         """Refresh icon colour and tooltip from fresh UsageData."""
-        self._icon.icon = _make_icon_image(_session_color(data.session_percent))
-        self._icon.title = data.tooltip_text()
+        percent = data.session_percent
+        if percent is None and data.limits:
+            # No five_hour bucket in the response — fall back to the worst
+            # bucket instead of showing a meaningless grey dot.
+            percent = data.highest_percent
+        self._icon.icon = _make_icon_image(_session_color(percent))
+        self._icon.title = _clip_tip(data.tooltip_text())
 
     def set_error(self, message: str) -> None:
         """Switch to grey icon and show error in tooltip."""
         self._icon.icon = _make_icon_image("grey")
-        short = message[:120] + "…" if len(message) > 120 else message
-        self._icon.title = f"Error: {short}"
+        self._icon.title = _clip_tip(f"Error: {message}")

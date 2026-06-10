@@ -5,6 +5,7 @@ Config file location: %APPDATA%\\claude-usage-monitor\\config.toml  (Windows)
 
 from __future__ import annotations
 
+import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,8 +15,10 @@ import tomli_w
 
 
 def _config_dir() -> Path:
-    # Windows: %APPDATA%\claude-usage-monitor
-    base = Path.home() / "AppData" / "Roaming"
+    # Windows: %APPDATA%\claude-usage-monitor. Respect the env var — profiles
+    # redirected via group policy don't live under Path.home().
+    appdata = os.environ.get("APPDATA")
+    base = Path(appdata) if appdata else Path.home() / "AppData" / "Roaming"
     return base / "claude-usage-monitor"
 
 
@@ -33,6 +36,13 @@ class Config:
     notification_thresholds: list[int] = field(default_factory=lambda: [80, 95])
     firefox_profile_path: str = ""
     log_level: str = "WARNING"
+    # Override the User-Agent sent to claude.ai (empty = built-in default).
+    # Lets users match their installed Firefox version without a rebuild if
+    # Cloudflare starts blocking after a browser update.
+    user_agent: str = ""
+    # Check GitHub once per app start for a newer release and offer to open
+    # the release page.
+    update_check: bool = True
 
     # Internal: not written to TOML
     _path: Path = field(default_factory=_default_config_path, repr=False, compare=False)
@@ -49,11 +59,20 @@ class Config:
         with open(resolved, "rb") as f:
             data: dict[str, Any] = tomllib.load(f)
 
+        # Floor at 10 s: 0 or a negative value would make Event.wait() return
+        # immediately and turn the poll loop into a busy loop against claude.ai.
+        interval = max(10, int(data.get("poll_interval_seconds", 30)))
+        # Coerce to int here — string thresholds from a hand-edited TOML would
+        # otherwise raise TypeError on every threshold comparison at poll time.
+        thresholds = [int(t) for t in data.get("notification_thresholds", [80, 95])]
+
         return cls(
-            poll_interval_seconds=int(data.get("poll_interval_seconds", 30)),
-            notification_thresholds=list(data.get("notification_thresholds", [80, 95])),
+            poll_interval_seconds=interval,
+            notification_thresholds=thresholds,
             firefox_profile_path=str(data.get("firefox_profile_path", "")),
             log_level=str(data.get("log_level", "WARNING")),
+            user_agent=str(data.get("user_agent", "")),
+            update_check=bool(data.get("update_check", True)),
             _path=resolved,
         )
 
@@ -65,6 +84,8 @@ class Config:
             "notification_thresholds": self.notification_thresholds,
             "firefox_profile_path": self.firefox_profile_path,
             "log_level": self.log_level,
+            "user_agent": self.user_agent,
+            "update_check": self.update_check,
         }
         with open(self._path, "wb") as f:
             tomli_w.dump(data, f)

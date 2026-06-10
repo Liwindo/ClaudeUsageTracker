@@ -12,14 +12,15 @@ from __future__ import annotations
 import ctypes
 import json
 import tkinter as tk
+import webbrowser
 from datetime import datetime
-from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw, ImageTk
 
-from .config import log_file_path
+from . import __version__
+from .config import _config_dir, log_file_path
 from .models import UsageData
 
 # ── Design tokens — opaque vertical-gradient palette ──────────────────────────
@@ -54,9 +55,7 @@ _W       = 256
 _BAR_H   = 6      # rounded-pill progress bar height
 _DOT_PX  = 14     # status dot canvas size (incl. halo)
 _RADIUS  = 10     # outer window corner radius
-_POS_FILE = (
-    Path.home() / "AppData" / "Roaming" / "claude-usage-monitor" / "widget_pos.json"
-)
+_POS_FILE = _config_dir() / "widget_pos.json"
 
 _WEEKLY_KEYS = [
     "seven_day", "seven_day_sonnet", "seven_day_opus",
@@ -129,6 +128,24 @@ def _reset_color(li) -> str:
     if secs < 90 * 60:
         return _WARN
     return _ALERT
+
+
+def _virtual_screen_bounds() -> tuple[int, int, int, int]:
+    """(x, y, w, h) of the Windows virtual desktop spanning all monitors.
+
+    winfo_screenwidth/-height only cover the primary monitor, which would
+    yank a deliberately-on-second-monitor widget back onto the primary.
+    Returns (0, 0, 0, 0) on failure (callers must check w/h > 0).
+    """
+    try:
+        u = ctypes.windll.user32
+        # SM_XVIRTUALSCREEN/SM_YVIRTUALSCREEN/SM_CX…/SM_CY… = 76/77/78/79
+        return (
+            u.GetSystemMetrics(76), u.GetSystemMetrics(77),
+            u.GetSystemMetrics(78), u.GetSystemMetrics(79),
+        )
+    except Exception:
+        return (0, 0, 0, 0)
 
 
 # ── Rounded outer corners (Windows; best-effort) ──────────────────────────────
@@ -319,6 +336,7 @@ class Widget:
         self._last_data: Optional[UsageData] = None
         self._last_error: Optional[str] = None
         self._tooltip_win: Optional[tk.Toplevel] = None
+        self._update_win: Optional[tk.Toplevel] = None
         self._minimized: bool = False
 
     # ── Public API (thread-safe) ──────────────────────────────────────────────
@@ -345,6 +363,13 @@ class Widget:
 
         if not self._minimized:
             root.deiconify()
+        # Render any snapshot that arrived before the UI existed (the first
+        # poll usually completes before tk.Tk() is up). Scheduled via after()
+        # so it runs inside the mainloop, after the window is mapped.
+        if self._last_error is not None:
+            root.after(0, self._apply_error, self._last_error)
+        elif self._last_data is not None:
+            root.after(0, self._apply_data, self._last_data)
         # Evaluate peak window only after `_min_h` is captured from the natural
         # (banner-free) layout, so shrink-back at end-of-peak knows the floor.
         # Defer via after() so the initial deiconify + <Configure> + SetWindowRgn
@@ -355,20 +380,26 @@ class Widget:
         root.after(0, self._tick_peak_banner)
         root.mainloop()
 
+    def _post(self, callback, *args) -> bool:
+        """Schedule *callback* on the Tk thread; tolerate shutdown races.
+
+        Callers live on the poller / pystray threads. `after()` on a destroyed
+        root raises TclError (and RuntimeError in rare interpreter-teardown
+        windows) — swallowing those here keeps a late poll result from killing
+        the poller thread during quit.
+        """
+        root = self._root
+        if not root:
+            return False
+        try:
+            root.after(0, callback, *args)
+            return True
+        except (RuntimeError, tk.TclError):
+            return False
+
     def stop(self) -> None:
         if self._root:
-            self._root.after(0, self._root.destroy)
-
-    def restore(self) -> None:
-        """Show the widget if it was hidden."""
-        if self._root:
-            def _do():
-                self._root.deiconify()
-                self._root.attributes("-topmost", True)
-                self._minimized = False
-                self._refresh_peak_banner()  # catch any state change while hidden
-                self._save_position()
-            self._root.after(0, _do)
+            self._post(self._root.destroy)
 
     def toggle(self) -> None:
         """Show the widget if hidden, hide it if visible."""
@@ -383,15 +414,71 @@ class Widget:
                     self._root.withdraw()
                     self._minimized = True
                 self._save_position()
-            self._root.after(0, _do)
+            self._post(_do)
 
     def update(self, data: UsageData) -> None:
-        if self._root:
-            self._root.after(0, self._apply_data, data)
+        if not self._post(self._apply_data, data):
+            # The first poll usually finishes before start() has built the UI —
+            # buffer the snapshot so start() renders it instead of "connecting…".
+            self._last_data = data
+            self._last_error = None
 
     def set_error(self, message: str) -> None:
-        if self._root:
-            self._root.after(0, self._apply_error, message)
+        if not self._post(self._apply_error, message):
+            self._last_error = message
+
+    def notify_update(self, latest_version: str, url: str) -> None:
+        """Show a dialog offering to open the GitHub release page. Thread-safe."""
+        self._post(self._show_update_dialog, latest_version, url)
+
+    def _show_update_dialog(self, latest_version: str, url: str) -> None:
+        if self._update_win is not None or not self._root:
+            return
+        win = tk.Toplevel(self._root)
+        self._update_win = win
+        win.title("Claude Usage Tracker — Update")
+        win.configure(bg=_BG, padx=22, pady=16)
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+
+        tk.Label(
+            win, text=f"Version {latest_version} is available",
+            font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            win, text=f"You are running version {__version__}.",
+            font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w",
+        ).pack(fill="x", pady=(4, 14))
+
+        def _close() -> None:
+            self._update_win = None
+            win.destroy()
+
+        def _open_repo() -> None:
+            webbrowser.open(url)
+            _close()
+
+        row = tk.Frame(win, bg=_BG)
+        row.pack(fill="x")
+        # side="right" packs right-to-left: Cancel ends up rightmost,
+        # matching the Windows [primary] [cancel] button order.
+        for text, cmd in (("Cancel", _close), ("Open GitHub", _open_repo)):
+            tk.Button(
+                row, text=text, command=cmd,
+                font=_FONT_BTN, bg=_BTN_BG, fg=_TEXT,
+                activebackground=_BTN_HOV, activeforeground=_TEXT,
+                relief="flat", padx=12, pady=3, cursor="hand2",
+                bd=0, highlightthickness=0,
+            ).pack(side="right", padx=(8, 0))
+
+        win.protocol("WM_DELETE_WINDOW", _close)
+        win.bind("<Escape>", lambda e: _close())
+
+        # Centre on screen (works whether or not the main widget is visible).
+        win.update_idletasks()
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        w, h = win.winfo_width(), win.winfo_height()
+        win.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -803,6 +890,12 @@ class Widget:
                 self._minimized = bool(pos.get("minimized", False))
             except Exception:
                 pass
+        # Saved coords may point at a monitor that no longer exists — clamp
+        # into the virtual desktop so the widget is never unreachable.
+        vx, vy, vw, vh = _virtual_screen_bounds()
+        if vw > 0 and vh > 0:
+            x = max(vx, min(x, vx + vw - 60))
+            y = max(vy, min(y, vy + vh - 40))
         root.update_idletasks()
         # Never start below the natural content height — otherwise the footer
         # (buttons) is clipped from the first frame onward.
