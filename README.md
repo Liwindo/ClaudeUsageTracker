@@ -3,14 +3,10 @@
 [![CI](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml)
 
 <p align="center">
-  <img src="src/claude_usage_monitor/assets/logo.png" alt="Claude Usage Tracker" width="200">
+  <img src="docs/screenshot.png" alt="Floating widget" width="300">
 </p>
 
 A lightweight Windows system-tray tool that shows your [claude.ai](https://claude.ai) usage limits at a glance — a colour-coded tray icon and an optional floating widget, updated automatically in the background, so you never have to interrupt a conversation to check the usage page.
-
-<p align="center">
-  <img src="docs/screenshot.png" alt="Floating widget" width="300">
-</p>
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
