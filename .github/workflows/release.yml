@@ -15,7 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v8.2.0
+      # Non-immutable actions: pinned to commit SHAs (CodeQL supply-chain
+      # hardening — tags can be moved, SHAs cannot).
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -27,7 +29,7 @@ jobs:
         run: uv run pyinstaller ClaudeUsageTracker.spec --noconfirm
 
       - name: Publish release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           files: dist/ClaudeUsageTracker.exe
           generate_release_notes: true
