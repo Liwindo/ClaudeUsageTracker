@@ -1,0 +1,33 @@
+name: Release
+
+# Pushing a tag like v1.4.0 runs the tests, builds the EXE, and publishes
+# a GitHub release with the EXE attached and auto-generated notes.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Build EXE
+        run: uv run pyinstaller ClaudeUsageTracker.spec --noconfirm
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ClaudeUsageTracker.exe
+          generate_release_notes: true

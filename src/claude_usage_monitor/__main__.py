@@ -19,6 +19,35 @@ def _show_error_dialog(title: str, message: str) -> None:
         pass
 
 
+def _show_info_dialog(title: str, message: str) -> None:
+    try:
+        ctypes.windll.user32.MessageBoxW(0, message, title, 0x40)  # MB_ICONINFORMATION
+    except Exception:
+        pass
+
+
+# Keep a module-level reference so the mutex handle lives for the whole
+# process lifetime — Windows releases it automatically on exit.
+_instance_mutex = None
+
+
+def _another_instance_running() -> bool:
+    """Create the app's named mutex; True if another instance already owns it.
+
+    Never raises — if the mutex cannot be created for any reason, startup
+    proceeds (running twice is annoying, refusing to start is worse).
+    """
+    global _instance_mutex
+    _ERROR_ALREADY_EXISTS = 183
+    try:
+        _instance_mutex = ctypes.windll.kernel32.CreateMutexW(
+            None, False, "claude-usage-monitor-single-instance"
+        )
+        return ctypes.windll.kernel32.GetLastError() == _ERROR_ALREADY_EXISTS
+    except Exception:
+        return False
+
+
 def _setup_logging(config: Config) -> Path:
     log_file = log_file_path()
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -44,6 +73,14 @@ def _setup_logging(config: Config) -> Path:
 
 
 def main() -> None:
+    if _another_instance_running():
+        _show_info_dialog(
+            "Claude Usage Tracker",
+            "Claude Usage Tracker is already running.\n"
+            "Look for the coloured circle in the system tray.",
+        )
+        sys.exit(0)
+
     try:
         config = Config.load()
     except Exception as exc:
@@ -54,6 +91,9 @@ def main() -> None:
         sys.exit(1)
 
     log_file = _setup_logging(config)
+
+    from .autostart import sync_autostart
+    sync_autostart(config.autostart)
 
     try:
         from .app import App

@@ -1,10 +1,16 @@
 # Claude Usage Tracker
 
+[![CI](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml)
+
 <p align="center">
   <img src="src/claude_usage_monitor/assets/logo.png" alt="Claude Usage Tracker" width="200">
 </p>
 
 A lightweight Windows system-tray tool that shows your [claude.ai](https://claude.ai) usage limits at a glance — a colour-coded tray icon and an optional floating widget, updated automatically in the background, so you never have to interrupt a conversation to check the usage page.
+
+<p align="center">
+  <img src="docs/screenshot.png" alt="Floating widget" width="300">
+</p>
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
@@ -23,7 +29,7 @@ Install [uv](https://docs.astral.sh/uv/), clone the repo, and run `build_exe.bat
 
 The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running.
 
-Once per app start it also asks the GitHub API whether a newer release exists; if so, a dialog offers to open the release page (or cancel). Disable with `update_check = false`.
+Once per app start it also asks the GitHub API whether a newer release exists; if so, a dialog offers to open the release page, skip that release permanently, or cancel (ask again next start). Disable with `update_check = false`. Only one instance can run at a time — starting the EXE again just shows a hint.
 
 **Why Firefox only?** Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption — only the browser itself can decrypt them, and there is no user-space workaround. Firefox stores cookies unencrypted in SQLite, making it the only reliably supported browser.
 
@@ -86,16 +92,27 @@ user_agent = ""
 # dialog offers to open the release page (or cancel). Set to false to
 # disable the check entirely — no request is made to GitHub then.
 update_check = true
+
+# Set automatically by the update dialog's "Skip version" button; that
+# release is never offered again. Clear it to re-enable the dialog.
+skip_update_version = ""
+
+# Start with Windows (current user). Only effective for the packaged EXE;
+# the registry entry is kept in sync with this value on every start.
+autostart = false
 ```
 
 ## Development
 
 ```bash
-uv sync
+uv sync --extra dev
+uv run pytest          # run the test suite
 start.bat              # run from source (no console window)
 build_exe.bat          # incremental EXE build (~10 s with cache)
 build_exe_clean.bat    # clean rebuild from scratch (~30 s)
 ```
+
+CI runs the tests on every push and pull request. Pushing a `v*` tag builds the EXE and publishes a GitHub release automatically.
 
 ## Troubleshooting
 
@@ -126,8 +143,11 @@ src/claude_usage_monitor/
 ├── widget.py            Persistent always-on-top tkinter widget
 ├── notifications.py     Desktop notification throttling
 ├── update_check.py      One-shot GitHub release check at startup
+├── autostart.py         HKCU Run-key sync for "start with Windows"
 └── assets/              Application icons (logo.png, logo.ico)
 ```
+
+Tests live in `tests/`; CI and release workflows in `.github/workflows/`.
 
 ## License
 

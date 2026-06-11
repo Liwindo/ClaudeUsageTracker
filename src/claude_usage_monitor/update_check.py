@@ -50,9 +50,15 @@ def _is_newer(remote: str, local: str) -> bool:
     return r + (0,) * (width - len(r)) > l + (0,) * (width - len(l))
 
 
-def check_for_update() -> UpdateInfo | None:
+def check_for_update(skip_version: str = "") -> UpdateInfo | None:
     """Return UpdateInfo if GitHub has a newer release than the running
-    version, else None. Never raises."""
+    version, else None. Never raises.
+
+    Args:
+        skip_version: A version the user chose to skip via the update dialog.
+            That exact release is silently ignored; anything newer than it
+            still triggers the dialog.
+    """
     try:
         resp = httpx.get(
             _RELEASES_API,
@@ -80,6 +86,11 @@ def check_for_update() -> UpdateInfo | None:
         )
         return None
 
+    latest = tag.lstrip("vV")
+    if skip_version and latest == skip_version.lstrip("vV"):
+        logger.info("Update %s available but skipped by user preference.", latest)
+        return None
+
     url = str(data.get("html_url") or REPO_RELEASES_URL)
     logger.info("Update available: %s (running %s).", tag, __version__)
-    return UpdateInfo(latest_version=tag.lstrip("vV"), url=url)
+    return UpdateInfo(latest_version=latest, url=url)

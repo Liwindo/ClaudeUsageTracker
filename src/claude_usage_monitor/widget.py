@@ -427,11 +427,26 @@ class Widget:
         if not self._post(self._apply_error, message):
             self._last_error = message
 
-    def notify_update(self, latest_version: str, url: str) -> None:
-        """Show a dialog offering to open the GitHub release page. Thread-safe."""
-        self._post(self._show_update_dialog, latest_version, url)
+    def notify_update(
+        self,
+        latest_version: str,
+        url: str,
+        on_skip: Optional[Callable[[], None]] = None,
+    ) -> None:
+        """Show a dialog offering to open the GitHub release page. Thread-safe.
 
-    def _show_update_dialog(self, latest_version: str, url: str) -> None:
+        Args:
+            on_skip: Called (on the Tk thread) when the user chooses
+                "Skip version" — the dialog never reappears for this release.
+        """
+        self._post(self._show_update_dialog, latest_version, url, on_skip)
+
+    def _show_update_dialog(
+        self,
+        latest_version: str,
+        url: str,
+        on_skip: Optional[Callable[[], None]] = None,
+    ) -> None:
         if self._update_win is not None or not self._root:
             return
         win = tk.Toplevel(self._root)
@@ -458,11 +473,20 @@ class Widget:
             webbrowser.open(url)
             _close()
 
+        def _skip() -> None:
+            if on_skip is not None:
+                on_skip()
+            _close()
+
         row = tk.Frame(win, bg=_BG)
         row.pack(fill="x")
         # side="right" packs right-to-left: Cancel ends up rightmost,
-        # matching the Windows [primary] [cancel] button order.
-        for text, cmd in (("Cancel", _close), ("Open GitHub", _open_repo)):
+        # matching the Windows [primary] [secondary] [cancel] button order.
+        buttons = [("Cancel", _close)]
+        if on_skip is not None:
+            buttons.append(("Skip version", _skip))
+        buttons.append(("Open GitHub", _open_repo))
+        for text, cmd in buttons:
             tk.Button(
                 row, text=text, command=cmd,
                 font=_FONT_BTN, bg=_BTN_BG, fg=_TEXT,
