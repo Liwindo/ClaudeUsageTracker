@@ -13,3 +13,15 @@ updates:
     ignore:
       - dependency-name: pyinstaller
         update-types: ["version-update:semver-major"]
+
+  # Keeps the SHA-pinned actions in ci.yml / release.yml current —
+  # Dependabot bumps the SHA and the version comment together.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns:
+          - "*"
