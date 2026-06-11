@@ -76,9 +76,22 @@ class App:
         thread hand-off and tolerates a quit happening in the meantime.
         """
         time.sleep(3)
-        info = check_for_update()
+        info = check_for_update(skip_version=self._config.skip_update_version)
         if info:
-            self._widget.notify_update(info.latest_version, info.url)
+            self._widget.notify_update(
+                info.latest_version,
+                info.url,
+                on_skip=lambda v=info.latest_version: self._skip_update(v),
+            )
+
+    def _skip_update(self, version: str) -> None:
+        """Persist the user's choice to skip *version* (update dialog button)."""
+        logger.info("User skipped update %s.", version)
+        self._config.skip_update_version = version
+        try:
+            self._config.save()
+        except OSError as exc:
+            logger.warning("Could not persist skipped version: %s", exc)
 
     def _quit(self) -> None:
         logger.info("Quitting.")

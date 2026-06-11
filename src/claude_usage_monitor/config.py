@@ -46,6 +46,12 @@ class Config:
     # Check GitHub once per app start for a newer release and offer to open
     # the release page.
     update_check: bool = True
+    # Release version the user chose to skip via the update dialog's
+    # "Skip version" button. Set automatically; cleared by a newer release.
+    skip_update_version: str = ""
+    # Start with Windows (HKCU Run key). Only effective for the packaged EXE;
+    # the registry entry is synced to this value on every app start.
+    autostart: bool = False
 
     # Internal: not written to TOML
     _path: Path = field(default_factory=_default_config_path, repr=False, compare=False)
@@ -76,6 +82,8 @@ class Config:
             log_level=str(data.get("log_level", "WARNING")),
             user_agent=str(data.get("user_agent", "")),
             update_check=bool(data.get("update_check", True)),
+            skip_update_version=str(data.get("skip_update_version", "")),
+            autostart=bool(data.get("autostart", False)),
             _path=resolved,
         )
 
@@ -107,6 +115,8 @@ class Config:
             "log_level": self.log_level,
             "user_agent": self.user_agent,
             "update_check": self.update_check,
+            "skip_update_version": self.skip_update_version,
+            "autostart": self.autostart,
         }
 
     def save(self) -> None:
