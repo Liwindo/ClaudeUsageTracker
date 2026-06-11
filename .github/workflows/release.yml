@@ -15,6 +15,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Guard: extract this version's section from CHANGELOG.md. The release
+      # FAILS if no section exists — a release can never ship with only the
+      # auto-generated compare link again.
+      - name: Extract release notes from CHANGELOG.md
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $content = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[?$([regex]::Escape($version))\]?[^\r\n]*\r?\n(.*?)(?=^## |\z)"
+          $m = [regex]::Match($content, $pattern)
+          if (-not $m.Success -or -not $m.Groups[1].Value.Trim()) {
+            Write-Error ("CHANGELOG.md has no section for version $version. " +
+              "Add '## $version - <date>' with user-facing notes, then re-tag.")
+            exit 1
+          }
+          $m.Groups[1].Value.Trim() | Out-File release_notes.md -Encoding utf8
+          Write-Host "Release notes for ${version}:"
+          Get-Content release_notes.md
+
       # Non-immutable actions: pinned to commit SHAs (CodeQL supply-chain
       # hardening — tags can be moved, SHAs cannot).
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
@@ -32,4 +51,6 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           files: dist/ClaudeUsageTracker.exe
+          # Changelog section first, auto-generated compare link appended below.
+          body_path: release_notes.md
           generate_release_notes: true

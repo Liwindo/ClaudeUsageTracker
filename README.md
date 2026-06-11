@@ -112,7 +112,7 @@ build_exe.bat          # incremental EXE build (~10 s with cache)
 build_exe_clean.bat    # clean rebuild from scratch (~30 s)
 ```
 
-CI runs the tests on every push and pull request. Pushing a `v*` tag builds the EXE and publishes a GitHub release automatically.
+CI runs the tests on every push and pull request. Pushing a `v*` tag builds the EXE and publishes a GitHub release automatically, using the matching section of [CHANGELOG.md](CHANGELOG.md) as release notes — the release fails if that section is missing.
 
 ## Troubleshooting
 
