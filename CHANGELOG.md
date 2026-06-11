@@ -5,15 +5,11 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
-- Workflow hardening: minimal token permissions, supply-chain-pinned actions
-  (CodeQL: zero findings), Dependabot now also updates the pinned actions
-- Release notes are now sourced from this changelog instead of being
-  auto-generated from (non-existent) pull requests
-
 ## 1.4.0 — 2026-06-11
 
 ### ✨ New features
 
+- **The running version is visible in the app** — in the widget's title row and as a header line in the tray menu.
 - **Skip a release you don't want.** The update dialog now has a third button, **Skip version** — that release will never be offered again, while anything newer still triggers the dialog. (Undo by clearing `skip_update_version` in the config.)
 - **Start with Windows.** Set `autostart = true` in the config and the app registers itself to launch at login (current user, packaged EXE only). The entry is kept in sync on every start, so a moved EXE re-registers itself automatically.
 - **Only one instance at a time.** Launching the EXE while it's already running now just shows a short hint instead of starting a second tray icon that doubles every request to claude.ai.
@@ -21,8 +17,9 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ### 🔧 Under the hood
 
-- Releases are now built, tested, and published automatically on clean GitHub runners
+- Releases are now built, tested, and published automatically on clean GitHub runners, with release notes sourced from this changelog
 - A test suite (33 tests) guards the config migration, usage-response parsing, notification thresholds, and the update check; CI runs it on every change
+- Workflow hardening: minimal token permissions, supply-chain-pinned actions (CodeQL: zero findings); Dependabot keeps the pinned actions updated
 - The version number now lives in a single place (`__init__.py`)
 
 ### 📝 Docs

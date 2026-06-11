@@ -8,6 +8,7 @@ from typing import Callable
 from PIL import Image, ImageDraw
 import pystray
 
+from . import __version__
 from .config import log_file_path, _config_dir
 from .models import UsageData
 
@@ -77,6 +78,11 @@ class TrayIcon:
 
     def _build_icon(self) -> pystray.Icon:
         menu = pystray.Menu(
+            # Disabled header line — shows which version is running.
+            pystray.MenuItem(
+                f"Claude Usage Tracker v{__version__}", None, enabled=False
+            ),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Show / hide widget", self._open, default=True),
             pystray.MenuItem("Refresh now", self._refresh),
             pystray.Menu.SEPARATOR,

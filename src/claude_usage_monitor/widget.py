@@ -518,10 +518,16 @@ class Widget:
         card = tk.Frame(root, bg=_BG, padx=18, pady=14)
         card.pack(fill="both", expand=True)
 
+        title_row = tk.Frame(card, bg=_BG)
+        title_row.pack(fill="x", pady=(0, 10))
         tk.Label(
-            card, text="Claude Usage Tracker",
+            title_row, text="Claude Usage Tracker",
             font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
-        ).pack(fill="x", pady=(0, 10))
+        ).pack(side="left")
+        tk.Label(
+            title_row, text=f"v{__version__}",
+            font=_FONT_LBL, bg=_BG, fg=_FOOT_C, anchor="e",
+        ).pack(side="right")
 
         # Peak-hour banner — packed dynamically only while the window is active.
         self._peak_banner = tk.Label(
