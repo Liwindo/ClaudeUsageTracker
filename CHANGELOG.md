@@ -5,6 +5,12 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 1.4.1 — 2026-06-20
+
+### 🐛 Bug fixes
+
+- The widget no longer creeps slightly downward on each restart or peak/non-peak transition. The peak-hour banner's grow/shrink now derives from an authoritative, banner-free window frame and re-asserts its position after Windows settles the resize — so a reverted move can no longer drift the bottom edge (or the saved position) down by the banner height.
+
 ## 1.4.0 — 2026-06-11
 
 ### ✨ New features

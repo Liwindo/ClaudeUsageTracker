@@ -329,6 +329,19 @@ class Widget:
         self._grip: Optional[tk.Label] = None
         self._last_size: tuple[int, int] = (0, 0)
 
+        # Authoritative banner-free window frame (top-left + size) the user
+        # controls via drag/resize. Persistence AND the banner grow/shrink
+        # derive from THIS, never from live winfo readings: on overrideredirect
+        # windows Windows can momentarily revert the position half of a combined
+        # size+move geometry change while honoring the size half (during the
+        # <Configure>/SetWindowRgn cascade). Reconstructing the natural frame
+        # from winfo at that instant drifts the saved y downward by the banner
+        # height on every peak toggle and restart.
+        self._base_x: int = 0
+        self._base_y: int = 0
+        self._base_w: int = _W
+        self._base_h: int = 0
+
         self._btn_fade_step = 0  # 0..6 — 0 hidden, 6 fully shown
         self._btn_fade_target = 0
         self._fade_job: Optional[str] = None
@@ -624,64 +637,99 @@ class Widget:
                 self._grow_for_banner()
 
     def _grow_for_banner(self) -> None:
-        """Add room for the banner by moving the top edge up — bottom stays put."""
+        """Make room for the banner by moving the top edge up — bottom stays put.
+
+        Geometry is derived from the authoritative banner-free frame
+        (`_base_*`), not from live winfo, and re-asserted after the resize
+        cascade settles (see `_post_banner_change`) so a position-revert by
+        Windows can no longer drift the bottom edge downward.
+        """
         if not self._root:
             return
-        self._root.update_idletasks()  # let the just-packed banner contribute to reqheight
-        cur_x = self._root.winfo_x()
-        cur_y = self._root.winfo_y()
-        cur_w = self._root.winfo_width()
-        cur_h = self._root.winfo_height()
-        req_h = self._root.winfo_reqheight()
-        if req_h > cur_h:
-            delta = req_h - cur_h
-            self._extra_for_banner = delta
-            # Anchor the bottom edge: keep (y + h) constant by moving y up.
-            self._root.geometry(f"{cur_w}x{req_h}+{cur_x}+{cur_y - delta}")
-            # IMPORTANT: do NOT call update() here — calling it synchronously
-            # from a Tk after()-callback re-enters the event loop and, on
-            # Win10, deadlocks against the <Configure> + SetWindowRgn cascade
-            # that this geometry change triggers. Defer save + re-clip to the
-            # next idle slot, which fires after the geometry has been honored.
-            self._root.after_idle(self._post_banner_change)
-
-    def _shrink_for_banner(self) -> None:
-        """Reverse `_grow_for_banner`: drop the top edge back down by `delta`."""
-        if not self._root or self._extra_for_banner <= 0:
+        self._root.update_idletasks()  # let the just-packed banner reach reqheight
+        req_h = self._root.winfo_reqheight()  # natural height WITH the banner
+        delta = req_h - self._base_h
+        if delta <= 0:
+            # The current frame already has enough slack for the banner — no
+            # geometry change needed (and nothing to reverse on shrink).
+            self._extra_for_banner = 0
             return
-        self._root.update_idletasks()  # let pack_forget flush so reqheight updates
-        delta = self._extra_for_banner
-        cur_x = self._root.winfo_x()
-        cur_y = self._root.winfo_y()
-        cur_w = self._root.winfo_width()
-        cur_h = self._root.winfo_height()
-        # Post-pack_forget reqheight = the natural banner-free content height.
-        # Floor at it so the footer (with its buttons) never gets clipped, even
-        # if the saved `_min_h` came from a previously over-shrunk widget.
-        natural_h = self._root.winfo_reqheight()
-        new_h = max(self._min_h, natural_h, cur_h - delta)
-        real_delta = cur_h - new_h
-        self._extra_for_banner = 0
-        # Mirror grow: bottom edge stays where it was, top edge drops by delta.
-        self._root.geometry(f"{cur_w}x{new_h}+{cur_x}+{cur_y + real_delta}")
+        self._extra_for_banner = delta
+        # Anchor the bottom edge: top up by delta, height up by delta.
+        self._root.geometry(
+            f"{self._base_w}x{req_h}+{self._base_x}+{self._base_y - delta}"
+        )
+        # IMPORTANT: do NOT call update() here — calling it synchronously from a
+        # Tk after()-callback re-enters the event loop and, on Win10, deadlocks
+        # against the <Configure> + SetWindowRgn cascade this triggers. Defer
+        # save + position re-assert to the next idle slot, after the geometry
+        # change has been honored.
         self._root.after_idle(self._post_banner_change)
 
+    def _shrink_for_banner(self) -> None:
+        """Reverse `_grow_for_banner`: restore the banner-free frame exactly."""
+        if not self._root or self._extra_for_banner <= 0:
+            return
+        self._extra_for_banner = 0
+        # Restore the authoritative frame: top drops back down, height shrinks.
+        self._root.geometry(
+            f"{self._base_w}x{self._base_h}+{self._base_x}+{self._base_y}"
+        )
+        self._root.after_idle(self._post_banner_change)
+
+    def _displayed_target(self) -> tuple[int, int, int, int]:
+        """The geometry the window SHOULD currently have, given the base frame
+        and whether the banner is occupying extra height (bottom-anchored)."""
+        if self._extra_for_banner > 0:
+            return (
+                self._base_x,
+                self._base_y - self._extra_for_banner,
+                self._base_w,
+                self._base_h + self._extra_for_banner,
+            )
+        return (self._base_x, self._base_y, self._base_w, self._base_h)
+
+    def _reassert_geometry(self) -> None:
+        """Snap the window back to its intended geometry if Windows drifted it.
+
+        Windows can revert the position half of a combined size+move on an
+        overrideredirect window while honoring the size half, leaving the
+        bottom edge floating down by the banner height. Re-setting the geometry
+        (size unchanged ⇒ `_on_configure` early-returns, so no cascade) fixes
+        it. Skipped mid-drag/-resize so it never fights the user.
+        """
+        if not self._root or self._dragging or self._resizing:
+            return
+        tx, ty, tw, th = self._displayed_target()
+        cur = (
+            self._root.winfo_x(), self._root.winfo_y(),
+            self._root.winfo_width(), self._root.winfo_height(),
+        )
+        if cur != (tx, ty, tw, th):
+            self._root.geometry(f"{tw}x{th}+{tx}+{ty}")
+
     def _post_banner_change(self) -> None:
-        """Persist + re-evaluate hover after a banner-driven resize.
+        """Re-assert geometry, persist, and re-evaluate hover after a banner
+        resize.
 
         `_apply_round_corners` is intentionally NOT called here — the size
-        change has already triggered `<Configure>` which re-clips the region.
+        change already triggered `<Configure>` which re-clips the region.
         Calling it again would invalidate the window region a second time and
         force a Win10 redraw that briefly fights with the fade animation.
         """
         if not self._root:
             return
+        # Correct any position-revert from the resize cascade BEFORE persisting,
+        # so the saved frame can never inherit a drifted value. A second check a
+        # beat later catches a late revert (position-only ⇒ no cascade).
+        self._reassert_geometry()
         self._save_position()
         # Re-evaluate hover against the new geometry RIGHT NOW so the buttons
         # reflect their correct state immediately, rather than waiting up to
         # 80 ms for the next `_poll_hover` tick (which can read intermittently
         # stale winfo_root* values during the transition).
         self._eval_hover()
+        self._root.after(60, self._reassert_geometry)
 
     def _metric_row(
         self, parent: tk.Frame, label: str
@@ -856,6 +904,7 @@ class Widget:
 
     def _drag_end(self, _e=None) -> None:
         if self._dragging:
+            self._sync_base_from_window()
             self._save_position()
         self._dragging = False
 
@@ -878,9 +927,29 @@ class Widget:
 
     def _resize_end(self, _e=None) -> None:
         if self._resizing:
+            self._sync_base_from_window()
             self._save_position()
             _apply_round_corners(self._root)
         self._resizing = False
+
+    def _sync_base_from_window(self) -> None:
+        """Refresh the authoritative frame from a user-initiated move/resize.
+
+        Reading winfo is safe here: drag and resize do not trigger the banner
+        geometry cascade, so the live values are reliable. The banner's extra
+        height (if showing) is stripped back out so the stored frame stays
+        banner-free.
+        """
+        if not self._root:
+            return
+        x, y = self._root.winfo_x(), self._root.winfo_y()
+        w, h = self._root.winfo_width(), self._root.winfo_height()
+        if self._extra_for_banner > 0:
+            y += self._extra_for_banner
+            h -= self._extra_for_banner
+        self._base_x, self._base_y = x, y
+        self._base_w = w
+        self._base_h = max(self._min_h, h)
 
     def _on_configure(self, e: tk.Event) -> None:
         if e.widget is not self._root:
@@ -930,45 +999,29 @@ class Widget:
         # Never start below the natural content height — otherwise the footer
         # (buttons) is clipped from the first frame onward.
         req_h = root.winfo_reqheight()
-        if h > 0:
-            root.geometry(f"{w}x{max(h, req_h)}+{x}+{y}")
-        else:
-            root.geometry(f"{w}x{req_h}+{x}+{y}")
+        final_h = max(h, req_h) if h > 0 else req_h
+        root.geometry(f"{w}x{final_h}+{x}+{y}")
+        # Seed the authoritative banner-free frame from the restored geometry.
+        self._base_x, self._base_y = x, y
+        self._base_w, self._base_h = w, final_h
 
     def _save_position(self) -> None:
+        """Persist the authoritative banner-free frame.
+
+        Always written from `_base_*` (kept in sync on restore/drag/resize),
+        never from live winfo — which is 0 while withdrawn and unreliable
+        during the banner geometry cascade. This is what keeps the saved y from
+        drifting downward across peak toggles and restarts.
+        """
         if not self._root:
             return
         try:
-            # winfo_x/y return 0 while the window is withdrawn; fall back to the
-            # last persisted coords so a save during minimized state doesn't
-            # snap the widget to (0, 0) on next launch.
-            if self._minimized and _POS_FILE.exists():
-                try:
-                    prev = json.loads(_POS_FILE.read_text())
-                    x = int(prev.get("x", self._root.winfo_x()))
-                    y = int(prev.get("y", self._root.winfo_y()))
-                    w = int(prev.get("w", self._root.winfo_width()))
-                    h = int(prev.get("h", self._root.winfo_height()))
-                except Exception:
-                    x, y = self._root.winfo_x(), self._root.winfo_y()
-                    w, h = self._root.winfo_width(), self._root.winfo_height()
-            else:
-                x, y = self._root.winfo_x(), self._root.winfo_y()
-                w, h = self._root.winfo_width(), self._root.winfo_height()
-                # Strip the banner's contribution from BOTH y and h so the
-                # persisted frame describes the banner-free layout. The banner
-                # pushes the top up by `extra` (bottom anchored), so the
-                # natural top is `y + extra` and the natural height is
-                # `h - extra` — together they preserve the bottom edge.
-                if self._peak_visible and self._extra_for_banner > 0:
-                    y = y + self._extra_for_banner
-                    h = max(self._min_h, h - self._extra_for_banner)
             _POS_FILE.parent.mkdir(parents=True, exist_ok=True)
             _POS_FILE.write_text(json.dumps({
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
+                "x": self._base_x,
+                "y": self._base_y,
+                "w": self._base_w,
+                "h": self._base_h,
                 "minimized": self._minimized,
             }))
         except Exception:
