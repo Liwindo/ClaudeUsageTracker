@@ -24,7 +24,7 @@ claude-usage-monitor = "claude_usage_monitor.__main__:main"
 [project.optional-dependencies]
 dev = [
     "pyinstaller>=6.21.0",
-    "pytest>=9.1.0",
+    "pytest>=9.1.1",
 ]
 
 [tool.hatch.version]
