@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/Liwindo/ClaudeUsageTracker?logo=github)](../../releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Liwindo/ClaudeUsageTracker/total?logo=github)](../../releases)
 [![License: MIT](https://img.shields.io/github/license/Liwindo/ClaudeUsageTracker)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
