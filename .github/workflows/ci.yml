@@ -12,7 +12,7 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Non-immutable action: pinned to the v8.2.0 commit SHA (CodeQL
       # supply-chain hardening — tags can be moved, SHAs cannot).
