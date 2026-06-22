@@ -1,4 +1,4 @@
-﻿name: Release
+name: Release
 
 # Pushing a tag like v1.4.0 runs the tests, builds the EXE, and publishes
 # a GitHub release with the EXE attached and auto-generated notes.
@@ -13,7 +13,7 @@ jobs:
   build-and-release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # full history so the previous tag can be resolved
 
@@ -58,7 +58,7 @@ jobs:
         run: uv run pyinstaller ClaudeUsageTracker.spec --noconfirm
 
       - name: Publish release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           files: dist/ClaudeUsageTracker.exe
           # Body comes exclusively from CHANGELOG.md (+ compare link) — no
