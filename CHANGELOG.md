@@ -11,6 +11,12 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 - The "update available" dialog shown at startup is now clearly branded as Claude Usage Tracker: it leads with the app logo and name plus an "Update available" header, so it's immediately obvious which app is reporting the update rather than relying on the title bar alone. The window title was shortened so it is no longer clipped in the compact dialog.
 
+### 🔧 Build / developer
+
+- The local build scripts (`build_exe.bat` / `build_exe_clean.bat`) now enforce the same quality gates as the GitHub release workflow: a CHANGELOG check for the current version, byte-compilation, the full test suite, and an abort if the existing EXE is locked — so a local build can no longer silently produce a stale or untested EXE.
+- Batch files are pinned to CRLF line endings (via `.gitattributes`) so `cmd.exe` parses them correctly regardless of editor or `core.autocrlf`.
+- The clean build now calls `build_exe.bat` by absolute path, avoiding a transient failure when the working directory was being synced.
+
 ## 1.4.2 — 2026-06-23
 
 ### ✨ New features
