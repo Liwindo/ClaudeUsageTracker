@@ -1,0 +1,128 @@
+"""Responsive peak-hour banner: the warning text must stay fully visible at any
+widget width, with the window height growing to fit the wrapped lines.
+
+These use a real (withdrawn) Tk root because the wrapping is genuine font/layout
+behaviour — `winfo_reqheight()` reflects the wrapped line count without the
+window ever being mapped, so the test needs no display and is safe in CI. It
+skips cleanly where Tk cannot initialise at all.
+"""
+from __future__ import annotations
+
+import pytest
+
+tk = pytest.importorskip("tkinter")
+
+import claude_usage_monitor.widget as W
+from claude_usage_monitor.widget import Widget
+
+
+@pytest.fixture()
+def widget(tmp_path, monkeypatch):
+    """A built Widget on a withdrawn Tk root, forced into the peak window."""
+    monkeypatch.setattr(W, "_peak_hour_window_local", lambda: (5, 11))
+    monkeypatch.setattr(W, "_POS_FILE", tmp_path / "widget_pos.json")
+    # The image caches are module-global and hold PhotoImages bound to whatever
+    # Tk interpreter first built them. Each test spins up a fresh root, so clear
+    # them or the next build hits 'image "pyimageN" doesn't exist'. (The real app
+    # only ever has one root, so this never bites in production.)
+    W._bar_cache.clear()
+    W._dot_cache.clear()
+    W._div_cache.clear()
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:  # no usable Tcl/Tk in this environment
+        pytest.skip(f"Tk unavailable: {exc}")
+    root.overrideredirect(True)
+
+    w = Widget(on_refresh=lambda: None, on_quit=lambda: None)
+    w._root = root
+    w._build_ui(root)
+    root.update_idletasks()
+    # Seed the authoritative banner-free frame, as start()/restore would.
+    w._min_h = root.winfo_reqheight()
+    w._base_x = w._base_y = 0
+    w._base_h = w._min_h
+    root.deiconify()
+    root.update()
+    try:
+        yield w, root
+    finally:
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+
+def _show_at_width(w, root, width: int) -> None:
+    """Pretend the user resized the widget to `width` and (re)fit the banner.
+
+    The window is mapped at the given width so `_banner_wraplength()` reads it
+    back from winfo_width(), exactly as it does after a real user resize.
+    """
+    w._base_w = width
+    root.geometry(f"{width}x{w._base_h}+0+0")
+    root.update()
+    if not w._peak_visible:
+        w._refresh_peak_banner()
+    else:
+        w._grow_for_banner()
+    root.update()
+
+
+def test_narrow_widget_wraps_banner_and_grows_height(widget):
+    w, root = widget
+
+    _show_at_width(w, root, 440)
+    wide_banner_h = w._peak_banner.winfo_reqheight()
+    wide_req = root.winfo_reqheight()
+    wide_disp_h = w._displayed_target()[3]
+    # The whole banner is visible: the window is at least the natural height.
+    assert wide_disp_h >= wide_req
+
+    _show_at_width(w, root, 200)  # the widget's minimum width
+    narrow_banner_h = w._peak_banner.winfo_reqheight()
+    narrow_req = root.winfo_reqheight()
+    narrow_disp_h = w._displayed_target()[3]
+
+    # The bug: without wraplength the label never wrapped, so its height (and
+    # the window height) stayed constant while text was clipped off the side.
+    assert narrow_banner_h > wide_banner_h, "banner did not wrap when narrowed"
+    assert narrow_disp_h > wide_disp_h, "window height did not grow to fit wrap"
+    assert narrow_disp_h >= narrow_req, "wrapped banner would be clipped"
+
+
+@pytest.mark.parametrize("width", [440, 320, 256, 220, 200])
+def test_full_banner_always_fits_the_window(widget, width):
+    w, root = widget
+    _show_at_width(w, root, width)
+    req_h = root.winfo_reqheight()
+    # extra is exactly the inflation over the banner-free frame, and the
+    # displayed height covers the natural requirement -> nothing is clipped.
+    assert w._extra_for_banner == max(0, req_h - w._base_h)
+    assert w._displayed_target()[3] >= req_h
+
+
+def test_wraplength_tracks_width(widget):
+    w, root = widget
+    _show_at_width(w, root, 256)
+    wrap_256 = w._peak_banner.cget("wraplength")
+    _show_at_width(w, root, 200)
+    wrap_200 = w._peak_banner.cget("wraplength")
+    # Narrower widget -> smaller wrap width -> banner reflows.
+    assert wrap_200 < wrap_256
+    assert wrap_200 == max(40, 200 - 2 * W._CARD_PADX - 2)
+
+
+def test_version_label_is_hover_revealed_like_buttons(widget):
+    w, root = widget
+    # At rest the version label is invisible (foreground == background)…
+    assert w._lbl_ver.cget("fg") == W._BG
+    # …fully hovered it matches the footer buttons' revealed colour…
+    w._btn_fade_step = w._btn_fade_target = 6
+    w._tick_button_fade()
+    assert w._lbl_ver.cget("fg") == W._FOOT_C
+    assert w._lbl_ver.cget("fg") == w._buttons[0].cget("fg")
+    # …and it hides again when the pointer leaves.
+    w._btn_fade_step = w._btn_fade_target = 0
+    w._tick_button_fade()
+    assert w._lbl_ver.cget("fg") == W._BG

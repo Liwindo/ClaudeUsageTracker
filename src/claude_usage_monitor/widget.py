@@ -52,6 +52,7 @@ _FONT_FT    = ("Consolas", 8)
 _FONT_BTN   = ("Segoe UI", 9)
 
 _W       = 256
+_CARD_PADX = 18   # inner horizontal padding of the card frame
 _BAR_H   = 6      # rounded-pill progress bar height
 _DOT_PX  = 14     # status dot canvas size (incl. halo)
 _RADIUS  = 10     # outer window corner radius
@@ -313,6 +314,7 @@ class Widget:
         self._dot: Optional[tk.Label] = None
         self._div: Optional[tk.Label] = None
         self._lbl_ft: Optional[tk.Label] = None
+        self._lbl_ver: Optional[tk.Label] = None  # version — hover-revealed
         self._peak_banner: Optional[tk.Label] = None
         self._session_row: Optional[tk.Frame] = None
         self._peak_visible: bool = False
@@ -528,7 +530,7 @@ class Widget:
         tk.Frame(root, bg=_BG_RIM,    height=1).pack(fill="x", side="top")
         tk.Frame(root, bg=_BG_SHEEN,  height=1).pack(fill="x", side="top")
 
-        card = tk.Frame(root, bg=_BG, padx=18, pady=14)
+        card = tk.Frame(root, bg=_BG, padx=_CARD_PADX, pady=14)
         card.pack(fill="both", expand=True)
 
         title_row = tk.Frame(card, bg=_BG)
@@ -537,10 +539,13 @@ class Widget:
             title_row, text="Claude Usage Tracker",
             font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
         ).pack(side="left")
-        tk.Label(
+        # Version label — like the footer buttons, it stays invisible (fg == bg)
+        # until the pointer is over the widget, then fades in via _tick_button_fade.
+        self._lbl_ver = tk.Label(
             title_row, text=f"v{__version__}",
-            font=_FONT_LBL, bg=_BG, fg=_FOOT_C, anchor="e",
-        ).pack(side="right")
+            font=_FONT_LBL, bg=_BG, fg=_BG, anchor="e",
+        )
+        self._lbl_ver.pack(side="right")
 
         # Peak-hour banner — packed dynamically only while the window is active.
         self._peak_banner = tk.Label(
@@ -636,29 +641,53 @@ class Widget:
                 self._peak_visible = True
                 self._grow_for_banner()
 
-    def _grow_for_banner(self) -> None:
-        """Make room for the banner by moving the top edge up — bottom stays put.
+    def _banner_wraplength(self) -> int:
+        """Pixel width the banner text may occupy before wrapping, derived from
+        the current window width minus the card's horizontal padding."""
+        width = self._root.winfo_width() if self._root else 0
+        if width <= 1:
+            width = self._base_w
+        # -2 fudge for the Label's own default internal padding.
+        return max(40, width - 2 * _CARD_PADX - 2)
 
-        Geometry is derived from the authoritative banner-free frame
-        (`_base_*`), not from live winfo, and re-asserted after the resize
-        cascade settles (see `_post_banner_change`) so a position-revert by
-        Windows can no longer drift the bottom edge downward.
-        """
-        if not self._root:
+    def _set_banner_wrap(self) -> None:
+        """Wrap the peak banner to the current content width so its full text is
+        always visible, however narrow the widget is. Left-justify the wrapped
+        lines. Height is taken care of by the callers via `winfo_reqheight()`."""
+        if self._peak_banner is None or not self._root:
             return
-        self._root.update_idletasks()  # let the just-packed banner reach reqheight
-        req_h = self._root.winfo_reqheight()  # natural height WITH the banner
-        delta = req_h - self._base_h
-        if delta <= 0:
-            # The current frame already has enough slack for the banner — no
-            # geometry change needed (and nothing to reverse on shrink).
-            self._extra_for_banner = 0
-            return
-        self._extra_for_banner = delta
-        # Anchor the bottom edge: top up by delta, height up by delta.
-        self._root.geometry(
-            f"{self._base_w}x{req_h}+{self._base_x}+{self._base_y - delta}"
+        self._peak_banner.configure(
+            wraplength=self._banner_wraplength(), justify="left"
         )
+
+    def _grow_for_banner(self) -> None:
+        """Resize the window so the (possibly multi-line) banner is fully shown,
+        keeping the bottom edge anchored — the top edge moves up by the banner's
+        height.
+
+        The banner is wrapped to the current width first, then the natural
+        height WITH the wrapped banner drives the extra height. Geometry is
+        derived from the authoritative banner-free frame (`_base_*`), not from
+        live winfo, and re-asserted after the resize cascade settles (see
+        `_post_banner_change`) so a position-revert by Windows can no longer
+        drift the bottom edge downward. Handles both grow (banner needs more
+        room) and shrink (widget got wider, fewer wrapped lines).
+        """
+        if not self._root or not self._peak_visible:
+            return
+        self._set_banner_wrap()
+        self._root.update_idletasks()  # let the wrapped banner reach reqheight
+        req_h = self._root.winfo_reqheight()  # natural height WITH the banner
+        self._extra_for_banner = max(0, req_h - self._base_h)
+        # Re-assert the bottom-anchored geometry only if it actually differs, so
+        # a no-op refresh does not churn the window.
+        tx, ty, tw, th = self._displayed_target()
+        cur = (
+            self._root.winfo_x(), self._root.winfo_y(),
+            self._root.winfo_width(), self._root.winfo_height(),
+        )
+        if (tx, ty, tw, th) != cur:
+            self._root.geometry(f"{tw}x{th}+{tx}+{ty}")
         # IMPORTANT: do NOT call update() here — calling it synchronously from a
         # Tk after()-callback re-enters the event loop and, on Win10, deadlocks
         # against the <Configure> + SetWindowRgn cascade this triggers. Defer
@@ -881,6 +910,9 @@ class Widget:
         bg = _lerp_hex(_BG, _BTN_BG, t)
         for btn in self._buttons:
             btn.configure(fg=fg, bg=bg)
+        # Version label rides the same fade — revealed only on hover.
+        if self._lbl_ver is not None:
+            self._lbl_ver.configure(fg=fg)
 
         if self._btn_fade_step != self._btn_fade_target:
             self._fade_job = self._root.after(22, self._tick_button_fade)
@@ -921,12 +953,34 @@ class Widget:
         if not self._resizing:
             return
         w = max(self._min_w, self._resize_start_w + (e.x_root - self._resize_start_x))
-        floor = self._min_h + self._extra_for_banner
+        if self._peak_visible and self._peak_banner is not None:
+            # Reflow the banner for the new width so the height floor below grows
+            # to keep every wrapped line visible — narrowing must not clip text.
+            self._peak_banner.configure(
+                wraplength=max(40, w - 2 * _CARD_PADX - 2), justify="left"
+            )
+            self._root.update_idletasks()
+            # winfo_reqheight is layout-natural (depends on wraplength, not the
+            # not-yet-applied width), so it already reflects the new line count.
+            floor = max(self._min_h, self._root.winfo_reqheight())
+        else:
+            floor = self._min_h + self._extra_for_banner
         h = max(floor, self._resize_start_h + (e.y_root - self._resize_start_y))
         self._root.geometry(f"{w}x{h}")
 
     def _resize_end(self, _e=None) -> None:
         if self._resizing:
+            # Recompute the banner footprint for the FINAL width before syncing
+            # the base frame, so `_sync_base_from_window` strips the right amount
+            # of height (and the saved frame matches the wrapped layout). B is
+            # the banner's occupied height = natural-with-banner minus the
+            # banner-free natural height (`_min_h`).
+            if self._peak_visible and self._peak_banner is not None:
+                self._set_banner_wrap()
+                self._root.update_idletasks()
+                self._extra_for_banner = max(
+                    0, self._root.winfo_reqheight() - self._min_h
+                )
             self._sync_base_from_window()
             self._save_position()
             _apply_round_corners(self._root)
