@@ -5,6 +5,8 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 1.4.2 — 2026-06-23
+
 ### ✨ New features
 
 - The version number in the title row now appears only on hover, just like the refresh / minimise / quit buttons — the resting widget stays clean.
