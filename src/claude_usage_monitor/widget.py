@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import ctypes
 import json
+import sys
 import tkinter as tk
 import webbrowser
 from datetime import datetime
+from pathlib import Path
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
@@ -88,6 +90,23 @@ def _peak_hour_window_local() -> Optional[tuple[int, int]]:
     start_local = base.replace(hour=_PEAK_PT_START).astimezone()
     end_local = base.replace(hour=_PEAK_PT_END).astimezone()
     return start_local.hour, end_local.hour
+
+
+# ── Asset loading ─────────────────────────────────────────────────────────────
+
+def _asset_path(name: str) -> Path:
+    """Absolute path to a bundled asset, in both source and frozen layouts.
+
+    PyInstaller copies the package (`datas=[('src/claude_usage_monitor',
+    'claude_usage_monitor')]`) into the onefile temp dir, so when frozen the
+    assets live under `sys._MEIPASS/claude_usage_monitor/assets/`. From source
+    they sit next to this module.
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base = Path(sys._MEIPASS) / "claude_usage_monitor" / "assets"
+    else:
+        base = Path(__file__).parent / "assets"
+    return base / name
 
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
@@ -442,6 +461,19 @@ class Widget:
         if not self._post(self._apply_error, message):
             self._last_error = message
 
+    def _load_logo(self, px: int) -> Optional[ImageTk.PhotoImage]:
+        """Return the app logo scaled to `px`×`px`, or None if it can't load.
+
+        A missing/corrupt asset must never block the update dialog, so any
+        failure is logged-by-omission and the caller falls back to text only.
+        """
+        try:
+            img = Image.open(_asset_path("logo.png")).convert("RGBA")
+            img = img.resize((px, px), Image.LANCZOS)
+            return ImageTk.PhotoImage(img)
+        except Exception:
+            return None
+
     def notify_update(
         self,
         latest_version: str,
@@ -466,10 +498,41 @@ class Widget:
             return
         win = tk.Toplevel(self._root)
         self._update_win = win
-        win.title("Claude Usage Tracker — Update")
-        win.configure(bg=_BG, padx=22, pady=16)
+        # Short title — the full app name lives in the (branded) body, and a long
+        # title gets clipped in the narrow window. The logo icon keeps it identifiable.
+        win.title("Update")
+        win.configure(bg=_BG, padx=22, pady=18)
         win.resizable(False, False)
         win.attributes("-topmost", True)
+
+        # ── Branded header: app logo + name, so it is unmistakably *this* app
+        # that is reporting the update (the title bar alone is easy to miss).
+        header = tk.Frame(win, bg=_BG)
+        header.pack(fill="x", pady=(0, 14))
+
+        logo = self._load_logo(48)
+        if logo is not None:
+            # Hold a reference on the window so Tk doesn't garbage-collect it.
+            win._logo_ref = logo  # type: ignore[attr-defined]
+            tk.Label(header, image=logo, bg=_BG, bd=0).pack(side="left", padx=(0, 12))
+            try:
+                win.iconphoto(False, logo)  # brand the taskbar / title bar too
+            except tk.TclError:
+                pass
+
+        brand = tk.Frame(header, bg=_BG)
+        brand.pack(side="left", fill="y")
+        tk.Label(
+            brand, text="Claude Usage Tracker",
+            font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
+        ).pack(fill="x")
+        tk.Label(
+            brand, text="Update available",
+            font=_FONT_LBL, bg=_BG, fg=_OK, anchor="w",
+        ).pack(fill="x", pady=(2, 0))
+
+        # Hairline divider under the header for a finished, card-like look.
+        tk.Frame(win, bg=_BORDER, height=1).pack(fill="x", pady=(0, 14))
 
         tk.Label(
             win, text=f"Version {latest_version} is available",
@@ -513,10 +576,12 @@ class Widget:
         win.protocol("WM_DELETE_WINDOW", _close)
         win.bind("<Escape>", lambda e: _close())
 
-        # Centre on screen (works whether or not the main widget is visible).
+        # Size to content, then never shrink below it, so the window always
+        # matches what it contains (and the short title never gets clipped).
         win.update_idletasks()
-        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         w, h = win.winfo_width(), win.winfo_height()
+        win.minsize(w, h)
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
 
     # ── UI construction ───────────────────────────────────────────────────────

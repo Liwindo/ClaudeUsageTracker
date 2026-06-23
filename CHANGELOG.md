@@ -5,6 +5,12 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 1.4.3 — 2026-06-24
+
+### 💄 UI
+
+- The "update available" dialog shown at startup is now clearly branded as Claude Usage Tracker: it leads with the app logo and name plus an "Update available" header, so it's immediately obvious which app is reporting the update rather than relying on the title bar alone. The window title was shortened so it is no longer clipped in the compact dialog.
+
 ## 1.4.2 — 2026-06-23
 
 ### ✨ New features
