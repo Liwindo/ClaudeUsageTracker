@@ -44,4 +44,4 @@ echo.
 echo   Cache cleared. Starting full gated build...
 echo.
 
-call build_exe.bat
+call "%~dp0build_exe.bat"
