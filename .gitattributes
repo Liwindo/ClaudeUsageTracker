@@ -1,0 +1,5 @@
+# cmd.exe misparses batch files that have LF (Unix) line endings — it drops the
+# leading characters of each line. Force CRLF on checkout so the build scripts
+# always run correctly, regardless of the contributor's editor or core.autocrlf.
+*.bat text eol=crlf
+*.cmd text eol=crlf
