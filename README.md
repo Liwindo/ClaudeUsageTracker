@@ -10,7 +10,7 @@
   <img src="docs/screenshot.png" alt="Floating widget" width="300">
 </p>
 
-A lightweight Windows system-tray tool that shows your [claude.ai](https://claude.ai) usage limits at a glance — a colour-coded tray icon and an optional floating widget, updated automatically in the background, so you never have to interrupt a conversation to check the usage page.
+A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left.
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
