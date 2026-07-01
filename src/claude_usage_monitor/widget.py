@@ -341,8 +341,11 @@ class Widget:
         self._peak_banner: Optional[tk.Label] = None
         self._session_row: Optional[tk.Frame] = None
         self._peak_visible: bool = False
-        self._extra_for_banner: int = 0  # height delta added by the banner
+        # Height delta added by wrapped content (peak banner and/or a footer
+        # status text that wrapped to multiple lines).
+        self._extra_h: int = 0
         self._buttons: list[tk.Button] = []
+        self._btn_frame: Optional[tk.Frame] = None
 
         self._dragging = False
         self._drag_x = self._drag_y = 0
@@ -694,7 +697,8 @@ class Widget:
                 self._root.after(60_000, self._tick_peak_banner)
 
     def _refresh_peak_banner(self) -> None:
-        """Apply the current peak-hour state to the banner. Idempotent."""
+        """Apply the current peak-hour state to the banner, then refit the
+        window height to all wrapped content. Idempotent."""
         if not self._root or self._peak_banner is None or self._minimized:
             return
         window = _peak_hour_window_local()
@@ -702,7 +706,6 @@ class Widget:
             if self._peak_visible:
                 self._peak_banner.pack_forget()
                 self._peak_visible = False
-                self._shrink_for_banner()
         else:
             start, end = window
             text = tr("widget.peak_banner", start=start, end=end)
@@ -712,48 +715,76 @@ class Widget:
                     fill="x", pady=(0, 8), before=self._session_row,
                 )
                 self._peak_visible = True
-                self._grow_for_banner()
+        self._refit_height()
 
-    def _banner_wraplength(self) -> int:
+    def _banner_wraplength(self, width: Optional[int] = None) -> int:
         """Pixel width the banner text may occupy before wrapping, derived from
-        the current window width minus the card's horizontal padding."""
-        width = self._root.winfo_width() if self._root else 0
-        if width <= 1:
-            width = self._base_w
+        the current (or given target) window width minus the card padding."""
+        if width is None:
+            width = self._root.winfo_width() if self._root else 0
+            if width <= 1:
+                width = self._base_w
         # -2 fudge for the Label's own default internal padding.
         return max(40, width - 2 * _CARD_PADX - 2)
 
-    def _set_banner_wrap(self) -> None:
+    def _set_banner_wrap(self, width: Optional[int] = None) -> None:
         """Wrap the peak banner to the current content width so its full text is
         always visible, however narrow the widget is. Left-justify the wrapped
         lines. Height is taken care of by the callers via `winfo_reqheight()`."""
         if self._peak_banner is None or not self._root:
             return
         self._peak_banner.configure(
-            wraplength=self._banner_wraplength(), justify="left"
+            wraplength=self._banner_wraplength(width), justify="left"
         )
 
-    def _grow_for_banner(self) -> None:
-        """Resize the window so the (possibly multi-line) banner is fully shown,
-        keeping the bottom edge anchored — the top edge moves up by the banner's
-        height.
+    def _footer_wraplength(self, width: Optional[int] = None) -> int:
+        """Pixel width the footer status text may occupy before wrapping:
+        window width minus card padding, the status dot, the dot→label gap,
+        and the footer buttons (always packed, merely hover-hidden)."""
+        if width is None:
+            width = self._root.winfo_width() if self._root else 0
+            if width <= 1:
+                width = self._base_w
+        used = 2 * _CARD_PADX + 6 + 2  # card padding + dot→label gap + fudge
+        if self._dot is not None:
+            used += self._dot.winfo_reqwidth()
+        if self._btn_frame is not None:
+            used += self._btn_frame.winfo_reqwidth()
+        return max(40, width - used)
 
-        The banner is wrapped to the current width first, then the natural
-        height WITH the wrapped banner drives the extra height. Geometry is
-        derived from the authoritative banner-free frame (`_base_*`), not from
-        live winfo, and re-asserted after the resize cascade settles (see
-        `_post_banner_change`) so a position-revert by Windows can no longer
-        drift the bottom edge downward. Handles both grow (banner needs more
-        room) and shrink (widget got wider, fewer wrapped lines).
-        """
-        if not self._root or not self._peak_visible:
+    def _set_footer_wrap(self, width: Optional[int] = None) -> None:
+        """Wrap the footer status line (error shorts are the longest texts —
+        translations can exceed the widget width) instead of clipping it."""
+        if self._lbl_ft is None or not self._root:
             return
-        self._set_banner_wrap()
-        self._root.update_idletasks()  # let the wrapped banner reach reqheight
-        req_h = self._root.winfo_reqheight()  # natural height WITH the banner
-        self._extra_for_banner = max(0, req_h - self._base_h)
-        # Re-assert the bottom-anchored geometry only if it actually differs, so
-        # a no-op refresh does not churn the window.
+        self._lbl_ft.configure(
+            wraplength=self._footer_wraplength(width), justify="left"
+        )
+
+    def _refit_height(self) -> None:
+        """Resize the window so ALL wrapped content — peak banner and footer
+        status line — is fully shown, keeping the bottom edge anchored — the
+        top edge moves up by the content's extra height.
+
+        The content is wrapped to the current width first, then the natural
+        height WITH the wrapped content drives the extra height. Geometry is
+        derived from the authoritative content-free frame (`_base_*`), not from
+        live winfo, and re-asserted after the resize cascade settles (see
+        `_post_refit`) so a position-revert by Windows can no longer drift the
+        bottom edge downward. Handles both grow (content needs more room) and
+        shrink (widget got wider / status text got shorter). A no-op refresh
+        (this runs on every poll) changes nothing and schedules no callback.
+        """
+        if not self._root:
+            return
+        if self._peak_visible:
+            self._set_banner_wrap()
+        self._set_footer_wrap()
+        self._root.update_idletasks()  # let the wrapped labels reach reqheight
+        req_h = self._root.winfo_reqheight()  # natural height WITH the content
+        extra = max(0, req_h - self._base_h)
+        changed = extra != self._extra_h
+        self._extra_h = extra
         tx, ty, tw, th = self._displayed_target()
         cur = (
             self._root.winfo_x(), self._root.winfo_y(),
@@ -761,33 +792,24 @@ class Widget:
         )
         if (tx, ty, tw, th) != cur:
             self._root.geometry(f"{tw}x{th}+{tx}+{ty}")
+            changed = True
         # IMPORTANT: do NOT call update() here — calling it synchronously from a
         # Tk after()-callback re-enters the event loop and, on Win10, deadlocks
         # against the <Configure> + SetWindowRgn cascade this triggers. Defer
         # save + position re-assert to the next idle slot, after the geometry
         # change has been honored.
-        self._root.after_idle(self._post_banner_change)
-
-    def _shrink_for_banner(self) -> None:
-        """Reverse `_grow_for_banner`: restore the banner-free frame exactly."""
-        if not self._root or self._extra_for_banner <= 0:
-            return
-        self._extra_for_banner = 0
-        # Restore the authoritative frame: top drops back down, height shrinks.
-        self._root.geometry(
-            f"{self._base_w}x{self._base_h}+{self._base_x}+{self._base_y}"
-        )
-        self._root.after_idle(self._post_banner_change)
+        if changed:
+            self._root.after_idle(self._post_refit)
 
     def _displayed_target(self) -> tuple[int, int, int, int]:
         """The geometry the window SHOULD currently have, given the base frame
-        and whether the banner is occupying extra height (bottom-anchored)."""
-        if self._extra_for_banner > 0:
+        and whether wrapped content is occupying extra height (bottom-anchored)."""
+        if self._extra_h > 0:
             return (
                 self._base_x,
-                self._base_y - self._extra_for_banner,
+                self._base_y - self._extra_h,
                 self._base_w,
-                self._base_h + self._extra_for_banner,
+                self._base_h + self._extra_h,
             )
         return (self._base_x, self._base_y, self._base_w, self._base_h)
 
@@ -810,9 +832,9 @@ class Widget:
         if cur != (tx, ty, tw, th):
             self._root.geometry(f"{tw}x{th}+{tx}+{ty}")
 
-    def _post_banner_change(self) -> None:
-        """Re-assert geometry, persist, and re-evaluate hover after a banner
-        resize.
+    def _post_refit(self) -> None:
+        """Re-assert geometry, persist, and re-evaluate hover after a content
+        refit resized the window.
 
         `_apply_round_corners` is intentionally NOT called here — the size
         change already triggered `<Configure>` which re-clips the region.
@@ -859,6 +881,7 @@ class Widget:
     def _build_buttons(self, foot: tk.Frame) -> None:
         frame = tk.Frame(foot, bg=_BG)
         frame.pack(side="right")
+        self._btn_frame = frame
         for glyph, cmd in [("⟳", self._on_refresh), ("−", self._minimize), ("×", self._on_quit)]:
             btn = tk.Button(
                 frame, text=glyph, command=cmd,
@@ -1026,34 +1049,40 @@ class Widget:
         if not self._resizing:
             return
         w = max(self._min_w, self._resize_start_w + (e.x_root - self._resize_start_x))
-        if self._peak_visible and self._peak_banner is not None:
-            # Reflow the banner for the new width so the height floor below grows
-            # to keep every wrapped line visible — narrowing must not clip text.
-            self._peak_banner.configure(
-                wraplength=max(40, w - 2 * _CARD_PADX - 2), justify="left"
-            )
-            self._root.update_idletasks()
-            # winfo_reqheight is layout-natural (depends on wraplength, not the
-            # not-yet-applied width), so it already reflects the new line count.
-            floor = max(self._min_h, self._root.winfo_reqheight())
-        else:
-            floor = self._min_h + self._extra_for_banner
+        # Reflow the wrapped content (banner + footer status) for the new width
+        # so the height floor below grows to keep every wrapped line visible —
+        # narrowing must not clip text.
+        if self._peak_visible:
+            self._set_banner_wrap(w)
+        self._set_footer_wrap(w)
+        self._root.update_idletasks()
+        # winfo_reqheight is layout-natural (depends on wraplength, not the
+        # not-yet-applied width), so it already reflects the new line count.
+        floor = max(self._min_h, self._root.winfo_reqheight())
         h = max(floor, self._resize_start_h + (e.y_root - self._resize_start_y))
         self._root.geometry(f"{w}x{h}")
 
     def _resize_end(self, _e=None) -> None:
         if self._resizing:
-            # Recompute the banner footprint for the FINAL width before syncing
-            # the base frame, so `_sync_base_from_window` strips the right amount
-            # of height (and the saved frame matches the wrapped layout). B is
-            # the banner's occupied height = natural-with-banner minus the
-            # banner-free natural height (`_min_h`).
-            if self._peak_visible and self._peak_banner is not None:
+            # Recompute the wrapped content's footprint for the FINAL width
+            # before syncing the base frame, so `_sync_base_from_window` strips
+            # the right amount of height (and the saved frame matches the
+            # wrapped layout).
+            if self._peak_visible:
                 self._set_banner_wrap()
-                self._root.update_idletasks()
-                self._extra_for_banner = max(
-                    0, self._root.winfo_reqheight() - self._min_h
-                )
+            self._set_footer_wrap()
+            self._root.update_idletasks()
+            req_h = self._root.winfo_reqheight()
+            h = self._root.winfo_height()
+            # The content's claim over the natural single-line frame …
+            delta = max(0, req_h - self._min_h)
+            # … is stripped from the user's height to get the base frame. If
+            # the user's height leaves slack beyond the content requirement,
+            # the slack stays in the base (extra = req_h - base would be ≤ 0),
+            # so the next `_refit_height` cannot shrink the window they just
+            # set. This keeps extra consistent with the refit formula.
+            provisional_base = max(self._min_h, h - delta)
+            self._extra_h = max(0, req_h - provisional_base)
             self._sync_base_from_window()
             self._save_position()
             _apply_round_corners(self._root)
@@ -1071,9 +1100,9 @@ class Widget:
             return
         x, y = self._root.winfo_x(), self._root.winfo_y()
         w, h = self._root.winfo_width(), self._root.winfo_height()
-        if self._extra_for_banner > 0:
-            y += self._extra_for_banner
-            h -= self._extra_for_banner
+        if self._extra_h > 0:
+            y += self._extra_h
+            h -= self._extra_h
         self._base_x, self._base_y = x, y
         self._base_w = w
         self._base_h = max(self._min_h, h)

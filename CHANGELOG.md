@@ -5,6 +5,10 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+### 🐛 Bug fixes
+
+- The widget's footer status line (e.g. "Session expired — open claude.ai in Firefox") no longer gets cut off at the right edge. Like the peak-hour banner, it now wraps to as many lines as needed for the current widget width — translations made these texts longer than the widget — and the window grows to keep every line visible, shrinking back once a shorter status arrives.
+
 ## 1.5.0 — 2026-07-01
 
 ### ✨ New features

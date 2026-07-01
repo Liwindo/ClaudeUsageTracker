@@ -65,7 +65,7 @@ def _show_at_width(w, root, width: int) -> None:
     if not w._peak_visible:
         w._refresh_peak_banner()
     else:
-        w._grow_for_banner()
+        w._refit_height()
     root.update()
 
 
@@ -98,7 +98,7 @@ def test_full_banner_always_fits_the_window(widget, width):
     req_h = root.winfo_reqheight()
     # extra is exactly the inflation over the banner-free frame, and the
     # displayed height covers the natural requirement -> nothing is clipped.
-    assert w._extra_for_banner == max(0, req_h - w._base_h)
+    assert w._extra_h == max(0, req_h - w._base_h)
     assert w._displayed_target()[3] >= req_h
 
 
@@ -156,6 +156,44 @@ def test_banner_renders_in_configured_language(widget):
         assert "Stoßzeit" in text and "05:00 – 11:00" in text
     finally:
         i18n.init("en")
+
+
+def test_long_footer_error_wraps_and_window_grows(widget):
+    from claude_usage_monitor import i18n
+
+    w, root = widget
+    _show_at_width(w, root, 200)
+    single_line_h = w._lbl_ft.winfo_reqheight()
+    try:
+        i18n.init("de")
+        # The longest localised error short ("Von Cloudflare blockiert — …").
+        w._apply_error("organizations/usage returned 403: Cloudflare blocked")
+        root.update()
+        lbl = w._lbl_ft
+        # The label must wrap instead of running off the right edge …
+        assert lbl.cget("wraplength") > 0
+        assert lbl.winfo_reqwidth() <= 200 - 2 * W._CARD_PADX, (
+            "footer text is wider than the widget — clipped"
+        )
+        assert lbl.winfo_reqheight() > single_line_h, "footer did not wrap"
+        # … and the window must grow so the wrapped lines are fully visible.
+        assert w._displayed_target()[3] >= root.winfo_reqheight()
+    finally:
+        i18n.init("en")
+
+
+def test_footer_shrinks_back_after_short_status(widget):
+    w, root = widget
+    _show_at_width(w, root, 200)
+    w._apply_error("organizations/usage returned 403: Cloudflare blocked")
+    root.update()
+    grown = w._displayed_target()[3]
+    # A short status afterwards must give the extra footer height back.
+    w._var_ft.set("active")
+    w._refit_height()
+    root.update()
+    assert w._displayed_target()[3] < grown
+    assert w._displayed_target()[3] >= root.winfo_reqheight()
 
 
 def test_version_label_is_hover_revealed_like_buttons(widget):
