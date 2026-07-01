@@ -5,8 +5,11 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 1.5.1 — 2026-07-01
+
 ### 🐛 Bug fixes
 
+- **The released EXE could no longer reach claude.ai (constant 403 "Session expired" even with a fresh Firefox login).** The GitHub build runner compiled the 1.5.0 EXE with its preinstalled Python 3.12, whose bundled OpenSSL produces a TLS fingerprint Cloudflare currently blocks. The build Python is now pinned to 3.14.4 (`.python-version`) — the same runtime the EXE was always built with locally, which Cloudflare accepts. Cookie reading itself was never affected.
 - The widget's footer status line (e.g. "Session expired — open claude.ai in Firefox") no longer gets cut off at the right edge. Like the peak-hour banner, it now wraps to as many lines as needed for the current widget width — translations made these texts longer than the widget — and the window grows to keep every line visible, shrinking back once a shorter status arrives.
 
 ## 1.5.0 — 2026-07-01
