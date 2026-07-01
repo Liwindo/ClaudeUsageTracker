@@ -144,6 +144,20 @@ def test_peak_window_local_returns_wall_clock_strings(monkeypatch):
     assert end == f"{base.replace(hour=11).astimezone():%H:%M}"
 
 
+def test_banner_renders_in_configured_language(widget):
+    from claude_usage_monitor import i18n
+
+    w, root = widget
+    try:
+        i18n.init("de")
+        w._refresh_peak_banner()
+        root.update()
+        text = w._peak_banner.cget("text")
+        assert "Stoßzeit" in text and "05:00 – 11:00" in text
+    finally:
+        i18n.init("en")
+
+
 def test_version_label_is_hover_revealed_like_buttons(widget):
     w, root = widget
     # At rest the version label is invisible (foreground == background)…

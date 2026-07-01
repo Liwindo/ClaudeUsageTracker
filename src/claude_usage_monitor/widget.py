@@ -23,6 +23,7 @@ from PIL import Image, ImageDraw, ImageTk
 
 from . import __version__
 from .config import _config_dir, log_file_path
+from .i18n import tr
 from .models import UsageData
 
 # ── Design tokens — opaque vertical-gradient palette ──────────────────────────
@@ -503,7 +504,7 @@ class Widget:
         self._update_win = win
         # Short title — the full app name lives in the (branded) body, and a long
         # title gets clipped in the narrow window. The logo icon keeps it identifiable.
-        win.title("Update")
+        win.title(tr("update.window_title"))
         win.configure(bg=_BG, padx=22, pady=18)
         win.resizable(False, False)
         win.attributes("-topmost", True)
@@ -530,7 +531,7 @@ class Widget:
             font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
         ).pack(fill="x")
         tk.Label(
-            brand, text="Update available",
+            brand, text=tr("update.available"),
             font=_FONT_LBL, bg=_BG, fg=_OK, anchor="w",
         ).pack(fill="x", pady=(2, 0))
 
@@ -538,11 +539,11 @@ class Widget:
         tk.Frame(win, bg=_BORDER, height=1).pack(fill="x", pady=(0, 14))
 
         tk.Label(
-            win, text=f"Version {latest_version} is available",
+            win, text=tr("update.version_available", version=latest_version),
             font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
         ).pack(fill="x")
         tk.Label(
-            win, text=f"You are running version {__version__}.",
+            win, text=tr("update.running_version", version=__version__),
             font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w",
         ).pack(fill="x", pady=(4, 14))
 
@@ -563,10 +564,10 @@ class Widget:
         row.pack(fill="x")
         # side="right" packs right-to-left: Cancel ends up rightmost,
         # matching the Windows [primary] [secondary] [cancel] button order.
-        buttons = [("Cancel", _close)]
+        buttons = [(tr("update.cancel"), _close)]
         if on_skip is not None:
-            buttons.append(("Skip version", _skip))
-        buttons.append(("Open GitHub", _open_repo))
+            buttons.append((tr("update.skip"), _skip))
+        buttons.append((tr("update.open_github"), _open_repo))
         for text, cmd in buttons:
             tk.Button(
                 row, text=text, command=cmd,
@@ -620,9 +621,13 @@ class Widget:
             card, text="", font=_FONT_LBL, bg=_BG, fg=_WARN, anchor="w",
         )
 
-        self._var_s, self._lbl_s, self._bar_s, self._session_row = self._metric_row(card, "Session")
+        self._var_s, self._lbl_s, self._bar_s, self._session_row = self._metric_row(
+            card, tr("widget.metric.session")
+        )
         tk.Frame(card, bg=_BG, height=10).pack()
-        self._var_w, self._lbl_w, self._bar_w, _ = self._metric_row(card, "Weekly")
+        self._var_w, self._lbl_w, self._bar_w, _ = self._metric_row(
+            card, tr("widget.metric.weekly")
+        )
 
         # Gradient divider (fades at the edges) — sits in its own 1px tall band
         div_band = tk.Frame(card, bg=_BG, height=1)
@@ -639,7 +644,7 @@ class Widget:
         self._dot.pack(side="left")
         self._set_dot_color(_OK)
 
-        self._var_ft = tk.StringVar(value="connecting…")
+        self._var_ft = tk.StringVar(value=tr("widget.status.connecting"))
         self._lbl_ft = tk.Label(
             foot, textvariable=self._var_ft,
             font=_FONT_FT, bg=_BG, fg=_FOOT_C,
@@ -667,8 +672,8 @@ class Widget:
             activebackground=_BTN_HOV, activeforeground=_TEXT,
             bd=0, relief="flat",
         )
-        ctx.add_command(label="Refresh", command=self._on_refresh)
-        ctx.add_command(label="Quit",    command=self._on_quit)
+        ctx.add_command(label=tr("widget.menu.refresh"), command=self._on_refresh)
+        ctx.add_command(label=tr("widget.menu.quit"), command=self._on_quit)
         root.bind("<Button-3>", lambda e: ctx.tk_popup(e.x_root, e.y_root))
 
         self._poll_hover()
@@ -700,7 +705,7 @@ class Widget:
                 self._shrink_for_banner()
         else:
             start, end = window
-            text = f"⚠ Peak hour ({start} – {end}) - reduced token limit"
+            text = tr("widget.peak_banner", start=start, end=end)
             self._peak_banner.configure(text=text)
             if not self._peak_visible and self._session_row is not None:
                 self._peak_banner.pack(
@@ -903,7 +908,7 @@ class Widget:
     def _show_tooltip(self) -> None:
         if self._tooltip_win or not self._last_error or not self._lbl_ft:
             return
-        text = f"{self._last_error}\n\nLog: {log_file_path()}"
+        text = f"{self._last_error}\n\n" + tr("widget.tooltip.log", path=log_file_path())
         x = self._lbl_ft.winfo_rootx()
         y = self._lbl_ft.winfo_rooty() - 8
         t = tk.Toplevel(self._root)
@@ -1164,7 +1169,10 @@ class Widget:
         self._set_divider()
 
         li = next((li for li in data.limits if li.key == "five_hour"), None)
-        self._var_ft.set(f"reset {li.reset_countdown}" if li else "active")
+        self._var_ft.set(
+            tr("widget.status.reset_in", countdown=li.reset_countdown)
+            if li else tr("widget.status.active")
+        )
         self._set_dot_color(_reset_color(li))
         # Re-evaluate the peak-hour banner on every poll (manual or scheduled)
         # so a clock change is reflected within the poll interval, not the
@@ -1178,19 +1186,22 @@ class Widget:
         self._set_metric(self._var_s, self._lbl_s, self._bar_s, None)
         self._set_metric(self._var_w, self._lbl_w, self._bar_w, None)
         self._set_divider()
+        # The keyword matching runs against the raw (deliberately untranslated,
+        # English) exception texts from client.py / firefox_cookies.py — only
+        # the short text shown to the user is localised.
         lc = message.lower()
         if "expired" in lc or "401" in lc:
-            short = "Session expired — open claude.ai in Firefox"
+            short = tr("widget.error.session_expired")
         elif "403" in lc or "cloudflare" in lc:
-            short = "Blocked by Cloudflare — visit claude.ai in Firefox"
+            short = tr("widget.error.cloudflare")
         elif "cookie" in lc or "firefox" in lc or "log in" in lc:
-            short = "Log in to claude.ai in Firefox first"
+            short = tr("widget.error.login")
         elif "429" in lc or "rate" in lc:
-            short = "Rate limited — waiting for next poll"
+            short = tr("widget.error.rate_limited")
         elif "network" in lc or "connect" in lc or "timeout" in lc:
-            short = "Network error — check connection"
+            short = tr("widget.error.network")
         else:
-            short = "Error — hover here for details"
+            short = tr("widget.error.generic")
         self._var_ft.set(short)
         self._set_dot_color(_ALERT)
         self._refresh_peak_banner()

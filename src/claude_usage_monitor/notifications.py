@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from .i18n import tr
 from .models import UsageData
 
 logger = logging.getLogger(__name__)
@@ -86,16 +87,13 @@ class NotificationManager:
     def _fire_threshold(self, label: str, percent: int, threshold: int) -> None:
         logger.info("Notification: %s reached %d%% (threshold %d%%)", label, percent, threshold)
         _notify(
-            title=f"Claude Usage — {label} at {percent}%",
-            message=(
-                f"You've reached {threshold}% of your {label} limit.\n"
-                "Consider wrapping up or waiting for the reset."
-            ),
+            title=tr("notify.threshold.title", label=label, percent=percent),
+            message=tr("notify.threshold.body", label=label, threshold=threshold),
         )
 
     def _fire_reset(self, label: str, percent: int) -> None:
         logger.info("Notification: %s reset (now %d%%)", label, percent)
         _notify(
-            title=f"Claude Usage — {label} reset",
-            message=f"{label} limit has reset. Current usage: {percent}%.",
+            title=tr("notify.reset.title", label=label),
+            message=tr("notify.reset.body", label=label, percent=percent),
         )

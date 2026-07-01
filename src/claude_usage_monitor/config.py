@@ -52,6 +52,10 @@ class Config:
     # Start with Windows (HKCU Run key). Only effective for the packaged EXE;
     # the registry entry is synced to this value on every app start.
     autostart: bool = False
+    # UI language: "auto" (Windows display language) or a catalog code such as
+    # "de", "en", "fr" — see src/claude_usage_monitor/locales/. Unknown values
+    # fall back to English. Takes effect on the next app start.
+    language: str = "auto"
 
     # Internal: not written to TOML
     _path: Path = field(default_factory=_default_config_path, repr=False, compare=False)
@@ -94,6 +98,7 @@ class Config:
             update_check=bool(data.get("update_check", True)),
             skip_update_version=str(data.get("skip_update_version", "")),
             autostart=bool(data.get("autostart", False)),
+            language=str(data.get("language", "auto")),
             _path=resolved,
         )
 
@@ -127,6 +132,7 @@ class Config:
             "update_check": self.update_check,
             "skip_update_version": self.skip_update_version,
             "autostart": self.autostart,
+            "language": self.language,
         }
 
     def save(self) -> None:

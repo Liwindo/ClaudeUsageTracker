@@ -5,6 +5,10 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+### ✨ New features
+
+- **The app is now multilingual.** All visible texts — widget, tray menu, desktop notifications, update dialog, and error messages — are available in English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, and Russian. The language follows the Windows display language automatically; a new `language` option in `config.toml` (default `"auto"`) can pin it to a specific language. Log file entries stay English so logs remain shareable for support.
+
 ## 1.4.3 — 2026-06-24
 
 ### 💄 UI

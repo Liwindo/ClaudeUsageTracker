@@ -8,7 +8,9 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from . import i18n
 from .config import Config, log_file_path
+from .i18n import tr
 
 
 def _show_error_dialog(title: str, message: str) -> None:
@@ -73,11 +75,14 @@ def _setup_logging(config: Config) -> Path:
 
 
 def main() -> None:
+    # Detected language for the dialogs shown before the config is available;
+    # re-initialised below once the configured language is known.
+    i18n.init("auto")
+
     if _another_instance_running():
         _show_info_dialog(
-            "Claude Usage Tracker",
-            "Claude Usage Tracker is already running.\n"
-            "Look for the coloured circle in the system tray.",
+            tr("dialog.already_running.title"),
+            tr("dialog.already_running.body"),
         )
         sys.exit(0)
 
@@ -85,11 +90,12 @@ def main() -> None:
         config = Config.load()
     except Exception as exc:
         _show_error_dialog(
-            "Claude Usage Tracker — Startup Error",
-            f"Failed to load configuration:\n\n{exc}",
+            tr("dialog.startup_error.title"),
+            tr("dialog.startup_error.body", error=exc),
         )
         sys.exit(1)
 
+    i18n.init(config.language)
     log_file = _setup_logging(config)
 
     from .autostart import sync_autostart
@@ -103,10 +109,8 @@ def main() -> None:
     except Exception as exc:
         logging.exception("Fatal error — application will exit.")
         _show_error_dialog(
-            "Claude Usage Tracker — Fatal Error",
-            f"The application crashed and must close.\n\n"
-            f"{exc}\n\n"
-            f"Full details in the log file:\n{log_file}",
+            tr("dialog.fatal.title"),
+            tr("dialog.fatal.body", error=exc, log_file=log_file),
         )
         sys.exit(1)
 

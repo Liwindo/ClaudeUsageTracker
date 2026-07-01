@@ -5,12 +5,13 @@
 [![License: MIT](https://img.shields.io/github/license/Liwindo/ClaudeUsageTracker)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![Languages](https://img.shields.io/badge/🌐_languages-9-2ea44f)
 
 <p align="center">
   <img src="docs/screenshot.png" alt="Floating widget" width="300">
 </p>
 
-A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left.
+A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left. The interface is available in 9 languages and follows your Windows display language automatically.
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
@@ -100,6 +101,11 @@ skip_update_version = ""
 # Start with Windows (current user). Only effective for the packaged EXE;
 # the registry entry is kept in sync with this value on every start.
 autostart = false
+
+# UI language. "auto" follows the Windows display language; or set one of
+# "en", "de", "es", "fr", "it", "nl", "pl", "pt", "ru" explicitly. Unknown
+# values fall back to English. Takes effect on the next app start.
+language = "auto"
 ```
 
 ## Development
@@ -144,6 +150,8 @@ src/claude_usage_monitor/
 ├── notifications.py     Desktop notification throttling
 ├── update_check.py      One-shot GitHub release check at startup
 ├── autostart.py         HKCU Run-key sync for "start with Windows"
+├── i18n.py              Translation lookup + Windows language detection
+├── locales/             Translation catalogs (one file per language)
 └── assets/              Application icons (logo.png, logo.ico)
 ```
 

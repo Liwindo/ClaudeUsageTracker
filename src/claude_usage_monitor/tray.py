@@ -10,6 +10,7 @@ import pystray
 
 from . import __version__
 from .config import log_file_path, _config_dir
+from .i18n import tr
 from .models import UsageData
 
 _ICON_SIZE = 64
@@ -83,18 +84,18 @@ class TrayIcon:
                 f"Claude Usage Tracker v{__version__}", None, enabled=False
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Show / hide widget", self._open, default=True),
-            pystray.MenuItem("Refresh now", self._refresh),
+            pystray.MenuItem(tr("tray.menu.show_hide"), self._open, default=True),
+            pystray.MenuItem(tr("tray.menu.refresh"), self._refresh),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("View log file", self._view_log),
-            pystray.MenuItem("Open app data folder", self._open_appdata),
+            pystray.MenuItem(tr("tray.menu.view_log"), self._view_log),
+            pystray.MenuItem(tr("tray.menu.open_appdata"), self._open_appdata),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", self._quit),
+            pystray.MenuItem(tr("tray.menu.quit"), self._quit),
         )
         icon = pystray.Icon(
             name="claude-usage-monitor",
             icon=_make_icon_image("grey"),
-            title="Claude Usage Tracker — loading…",
+            title=_clip_tip(tr("tray.loading")),
             menu=menu,
         )
         return icon
@@ -143,4 +144,4 @@ class TrayIcon:
     def set_error(self, message: str) -> None:
         """Switch to grey icon and show error in tooltip."""
         self._icon.icon = _make_icon_image("grey")
-        self._icon.title = _clip_tip(f"Error: {message}")
+        self._icon.title = _clip_tip(tr("tray.error", message=message))

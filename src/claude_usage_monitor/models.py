@@ -10,21 +10,25 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from .i18n import tr
+
 
 # Anthropic uses internal codenames for some model-specific weekly buckets.
 # Mapping is inferred from context; "omelette" appears to be Opus-class.
+# Values are translation keys (see locales/en.py); unmapped buckets get
+# "bucket.unknown". The dict order doubles as the display sort order.
 # REVERSE-ENGINEERED: update if Anthropic renames these.
 _CODENAME_LABELS: dict[str, str] = {
-    "five_hour": "Session (5h)",
-    "seven_day": "Weekly",
-    "seven_day_opus": "Opus Weekly",
-    "seven_day_sonnet": "Sonnet Weekly",
-    "seven_day_omelette": "Opus Weekly",       # internal codename
-    "seven_day_cowork": "Teams Weekly",         # internal codename
-    "seven_day_oauth_apps": "OAuth Apps Weekly",
-    "iguana_necktie": "Unknown (iguana_necktie)",
-    "tangelo": "Unknown (tangelo)",
-    "omelette_promotional": "Opus Promo",
+    "five_hour": "bucket.session",
+    "seven_day": "bucket.weekly",
+    "seven_day_opus": "bucket.opus_weekly",
+    "seven_day_sonnet": "bucket.sonnet_weekly",
+    "seven_day_omelette": "bucket.opus_weekly",     # internal codename
+    "seven_day_cowork": "bucket.teams_weekly",      # internal codename
+    "seven_day_oauth_apps": "bucket.oauth_weekly",
+    "iguana_necktie": "bucket.unknown",
+    "tangelo": "bucket.unknown",
+    "omelette_promotional": "bucket.opus_promo",
 }
 
 
@@ -48,12 +52,12 @@ class LimitInfo:
         """Human-readable countdown string, e.g. '3h 42m'."""
         secs = int(self.resets_in_seconds)
         if secs <= 0:
-            return "resetting…"
+            return tr("countdown.resetting")
         h, remainder = divmod(secs, 3600)
         m = remainder // 60
         if h:
-            return f"{h}h {m}m"
-        return f"{m}m"
+            return tr("countdown.hours_minutes", hours=h, minutes=m)
+        return tr("countdown.minutes", minutes=m)
 
     @classmethod
     def _parse_utilization(cls, raw: Any) -> int:
@@ -77,7 +81,9 @@ class LimitInfo:
 
     @classmethod
     def from_api(cls, key: str, data: dict[str, Any]) -> LimitInfo:
-        label = _CODENAME_LABELS.get(key, f"Unknown ({key})")
+        # `key` is only interpolated by the "bucket.unknown" template;
+        # str.format ignores it for the fixed labels.
+        label = tr(_CODENAME_LABELS.get(key, "bucket.unknown"), key=key)
         percent = cls._parse_utilization(data.get("utilization", 0))
         try:
             resets_at = datetime.fromisoformat(data["resets_at"])
@@ -146,4 +152,4 @@ class UsageData:
     def tooltip_text(self) -> str:
         """Short one-line tooltip for the tray icon."""
         parts = [f"{li.label} {li.percent}%" for li in self.limits]
-        return " · ".join(parts) if parts else "No data"
+        return " · ".join(parts) if parts else tr("tooltip.no_data")

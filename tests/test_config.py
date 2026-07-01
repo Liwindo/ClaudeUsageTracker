@@ -7,6 +7,7 @@ from claude_usage_monitor.config import Config
 ALL_KEYS = {
     "poll_interval_seconds", "notification_thresholds", "firefox_profile_path",
     "log_level", "user_agent", "update_check", "skip_update_version", "autostart",
+    "language",
 }
 
 
@@ -68,7 +69,7 @@ def test_new_options_round_trip(tmp_path):
     path = tmp_path / "config.toml"
     cfg = Config(
         user_agent="UA", update_check=False,
-        skip_update_version="2.0.0", autostart=True, _path=path,
+        skip_update_version="2.0.0", autostart=True, language="de", _path=path,
     )
     cfg.save()
     loaded = Config.load(path)
@@ -76,3 +77,4 @@ def test_new_options_round_trip(tmp_path):
     assert loaded.update_check is False
     assert loaded.skip_update_version == "2.0.0"
     assert loaded.autostart is True
+    assert loaded.language == "de"
