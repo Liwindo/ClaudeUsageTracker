@@ -78,6 +78,15 @@ def check_for_update(skip_version: str = "") -> UpdateInfo | None:
         logger.info("Update check failed: %s", exc)
         return None
 
+    # data is used outside the try above — a non-dict body (error shape, proxy
+    # page parsed as JSON list, …) would raise AttributeError and break the
+    # "never raises" contract this function promises its daemon thread.
+    if not isinstance(data, dict):
+        logger.info(
+            "Update check: unexpected response shape (%s).", type(data).__name__
+        )
+        return None
+
     tag = str(data.get("tag_name", "")).strip()
     if not tag or not _is_newer(tag, __version__):
         logger.debug(

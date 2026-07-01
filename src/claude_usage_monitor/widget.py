@@ -73,13 +73,16 @@ _PEAK_PT_START = 5
 _PEAK_PT_END = 11  # exclusive
 
 
-def _peak_hour_window_local() -> Optional[tuple[int, int]]:
-    """If now lies inside Anthropic's peak window, return its (start, end) hour
-    in the OS's local zone for display. Returns None otherwise.
+def _peak_hour_window_local() -> Optional[tuple[str, str]]:
+    """If now lies inside Anthropic's peak window, return its (start, end)
+    wall-clock times in the OS's local zone as "HH:MM" strings for display.
+    Returns None otherwise.
 
     The local zone is read from the OS at each call via the no-arg form of
-    `astimezone()`, so the displayed hours adapt automatically to wherever the
-    user runs the tool — no hard-coded Europe/Berlin assumption.
+    `astimezone()`, so the displayed times adapt automatically to wherever the
+    user runs the tool — no hard-coded Europe/Berlin assumption. Minutes are
+    part of the result because half-hour zones (e.g. UTC+5:30) land the window
+    off the full hour — a hard-coded ":00" would display it 30 min wrong.
     """
     now_pt = datetime.now(_PEAK_TZ)
     if now_pt.weekday() >= 5:  # Sat/Sun
@@ -89,7 +92,7 @@ def _peak_hour_window_local() -> Optional[tuple[int, int]]:
     base = now_pt.replace(minute=0, second=0, microsecond=0)
     start_local = base.replace(hour=_PEAK_PT_START).astimezone()
     end_local = base.replace(hour=_PEAK_PT_END).astimezone()
-    return start_local.hour, end_local.hour
+    return f"{start_local:%H:%M}", f"{end_local:%H:%M}"
 
 
 # ── Asset loading ─────────────────────────────────────────────────────────────
@@ -697,7 +700,7 @@ class Widget:
                 self._shrink_for_banner()
         else:
             start, end = window
-            text = f"⚠ Peak hour ({start:02d}:00 – {end:02d}:00) - reduced token limit"
+            text = f"⚠ Peak hour ({start} – {end}) - reduced token limit"
             self._peak_banner.configure(text=text)
             if not self._peak_visible and self._session_row is not None:
                 self._peak_banner.pack(

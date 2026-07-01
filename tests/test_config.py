@@ -48,6 +48,16 @@ def test_poll_interval_is_floored_at_10(tmp_path):
     assert Config.load(path).poll_interval_seconds == 10
 
 
+def test_scalar_thresholds_fall_back_to_defaults(tmp_path):
+    # "80" would iterate character-wise into [8, 0] (threshold 0 fires on
+    # every poll) and a bare 80 would raise TypeError and block startup.
+    for raw in (b'notification_thresholds = "80"\n',
+                b'notification_thresholds = 80\n'):
+        path = tmp_path / "config.toml"
+        path.write_bytes(raw)
+        assert Config.load(path).notification_thresholds == [80, 95]
+
+
 def test_string_thresholds_are_coerced_to_int(tmp_path):
     path = tmp_path / "config.toml"
     path.write_bytes(b'notification_thresholds = ["80", "95"]\n')

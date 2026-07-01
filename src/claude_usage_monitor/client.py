@@ -168,7 +168,10 @@ def _cached_tier(
         return cached[0]
     try:
         tier = fetch_subscription_tier(client, org_id, cookie_header, user_agent)
-    except ClaudeClientError as exc:
+    except Exception as exc:
+        # Catch everything, not just ClaudeClientError: the tier is cosmetic,
+        # and a surprise bootstrap schema (e.g. "account": null → AttributeError)
+        # must degrade to "unknown" instead of aborting the whole usage poll.
         logger.warning("Could not fetch subscription tier: %s", exc)
         # On failure keep any previous value rather than dropping to "unknown".
         return cached[0] if cached else "unknown"

@@ -71,9 +71,19 @@ class Config:
         # Floor at 10 s: 0 or a negative value would make Event.wait() return
         # immediately and turn the poll loop into a busy loop against claude.ai.
         interval = max(10, int(data.get("poll_interval_seconds", 30)))
+        # A hand-edited scalar must not slip through: "80" would iterate as
+        # characters into [8, 0] (threshold 0 fires on every poll) and a bare
+        # 80 would raise TypeError and block startup — fall back to defaults.
+        raw_thresholds = data.get("notification_thresholds", [80, 95])
+        if not isinstance(raw_thresholds, list):
+            logger.warning(
+                "notification_thresholds must be a TOML array like [80, 95], "
+                "got %r — using defaults.", raw_thresholds,
+            )
+            raw_thresholds = [80, 95]
         # Coerce to int here — string thresholds from a hand-edited TOML would
         # otherwise raise TypeError on every threshold comparison at poll time.
-        thresholds = [int(t) for t in data.get("notification_thresholds", [80, 95])]
+        thresholds = [int(t) for t in raw_thresholds]
 
         cfg = cls(
             poll_interval_seconds=interval,

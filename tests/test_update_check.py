@@ -66,6 +66,13 @@ def test_missing_html_url_falls_back_to_releases_page():
     assert info is not None and info.url == uc.REPO_RELEASES_URL
 
 
+def test_non_dict_body_returns_none():
+    # A non-dict JSON body used to raise AttributeError on data.get() outside
+    # the try block, breaking the function's never-raises contract.
+    with _with_response(200, ["unexpected"]):
+        assert uc.check_for_update() is None
+
+
 def test_non_200_returns_none():
     with _with_response(404, {}):
         assert uc.check_for_update() is None

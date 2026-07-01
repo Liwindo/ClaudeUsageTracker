@@ -43,7 +43,9 @@ def _find_default_profile() -> Path:
             "Is Firefox installed?"
         )
 
-    cfg = configparser.ConfigParser()
+    # interpolation=None: profiles.ini values are literal paths — a '%' in a
+    # profile path would otherwise raise InterpolationSyntaxError on read.
+    cfg = configparser.ConfigParser(interpolation=None)
     cfg.read(profiles_ini, encoding="utf-8")
 
     # Prefer the profile named in an [Install…] section (the one the default

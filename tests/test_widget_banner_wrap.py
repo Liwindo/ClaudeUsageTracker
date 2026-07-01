@@ -19,7 +19,7 @@ from claude_usage_monitor.widget import Widget
 @pytest.fixture()
 def widget(tmp_path, monkeypatch):
     """A built Widget on a withdrawn Tk root, forced into the peak window."""
-    monkeypatch.setattr(W, "_peak_hour_window_local", lambda: (5, 11))
+    monkeypatch.setattr(W, "_peak_hour_window_local", lambda: ("05:00", "11:00"))
     monkeypatch.setattr(W, "_POS_FILE", tmp_path / "widget_pos.json")
     # The image caches are module-global and hold PhotoImages bound to whatever
     # Tk interpreter first built them. Each test spins up a fresh root, so clear
@@ -111,6 +111,37 @@ def test_wraplength_tracks_width(widget):
     # Narrower widget -> smaller wrap width -> banner reflows.
     assert wrap_200 < wrap_256
     assert wrap_200 == max(40, 200 - 2 * W._CARD_PADX - 2)
+
+
+def test_banner_renders_minutes_from_window(widget, monkeypatch):
+    w, root = widget
+    # Half-hour zones (e.g. UTC+5:30) put the peak window off the full hour —
+    # the banner must render the minutes it is given, not a hard-coded ":00".
+    monkeypatch.setattr(W, "_peak_hour_window_local", lambda: ("17:30", "23:30"))
+    w._refresh_peak_banner()
+    assert "17:30 – 23:30" in w._peak_banner.cget("text")
+
+
+def test_peak_window_local_returns_wall_clock_strings(monkeypatch):
+    from datetime import datetime as real_dt, timedelta
+
+    # Any weekday morning inside the 05–11 PT window.
+    d = real_dt(2026, 7, 1, 7, 23, tzinfo=W._PEAK_TZ)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+
+    class FixedDatetime(real_dt):
+        @classmethod
+        def now(cls, tz=None):
+            return d
+
+    monkeypatch.setattr(W, "datetime", FixedDatetime)
+    window = W._peak_hour_window_local()
+    assert window is not None
+    start, end = window
+    base = d.replace(minute=0, second=0, microsecond=0)
+    assert start == f"{base.replace(hour=5).astimezone():%H:%M}"
+    assert end == f"{base.replace(hour=11).astimezone():%H:%M}"
 
 
 def test_version_label_is_hover_revealed_like_buttons(widget):

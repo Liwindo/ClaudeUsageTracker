@@ -96,3 +96,21 @@ def test_extract_org_id_rejects_bad_values(cookies):
 
 def test_build_cookie_header():
     assert build_cookie_header({"a": "1", "b": "2"}) == "a=1; b=2"
+
+
+def test_profiles_ini_percent_in_path_is_literal(tmp_path, monkeypatch):
+    # A '%' in a profile path must be read literally — configparser's default
+    # interpolation raised InterpolationSyntaxError on such values.
+    import claude_usage_monitor.firefox_cookies as fc
+    monkeypatch.setattr(fc, "_FIREFOX_APPDATA", tmp_path)
+    profile = tmp_path / "Profiles" / "abc.100%dev"
+    profile.mkdir(parents=True)
+    (tmp_path / "profiles.ini").write_text(
+        "[Profile0]\n"
+        "Name=default\n"
+        "IsRelative=1\n"
+        "Path=Profiles/abc.100%dev\n"
+        "Default=1\n",
+        encoding="utf-8",
+    )
+    assert fc._find_default_profile() == profile
