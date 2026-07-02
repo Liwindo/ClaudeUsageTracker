@@ -52,7 +52,9 @@ class LimitInfo:
         """Human-readable countdown string, e.g. '3h 42m'."""
         secs = int(self.resets_in_seconds)
         if secs <= 0:
-            return tr("countdown.resetting")
+            # An expired window is a caller-level state (the widget shows
+            # "waiting for first message"); the countdown stays a duration.
+            return tr("countdown.minutes", minutes=0)
         h, remainder = divmod(secs, 3600)
         m = remainder // 60
         if h:

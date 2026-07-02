@@ -196,6 +196,39 @@ def test_footer_shrinks_back_after_short_status(widget):
     assert w._displayed_target()[3] >= root.winfo_reqheight()
 
 
+def test_expired_session_shows_waiting_for_first_message(widget):
+    from datetime import datetime, timedelta, timezone
+
+    from claude_usage_monitor.models import LimitInfo, UsageData
+
+    w, root = widget
+    li = LimitInfo(
+        key="five_hour", label="Session (5h)", percent=0,
+        resets_at=datetime.now(tz=timezone.utc) - timedelta(minutes=5),
+    )
+    w._apply_data(UsageData(limits=[li]))
+    root.update()
+    # The old composition produced "reset resetting…"; the expired session is
+    # its own state: nothing resets until the user sends the first message.
+    assert w._var_ft.get() == "Waiting for first message"
+
+
+def test_running_session_still_shows_countdown(widget):
+    from datetime import datetime, timedelta, timezone
+
+    from claude_usage_monitor.models import LimitInfo, UsageData
+
+    w, root = widget
+    li = LimitInfo(
+        key="five_hour", label="Session (5h)", percent=40,
+        resets_at=datetime.now(tz=timezone.utc)
+        + timedelta(hours=2, minutes=5, seconds=30),
+    )
+    w._apply_data(UsageData(limits=[li]))
+    root.update()
+    assert w._var_ft.get() == "reset 2h 5m"
+
+
 def test_version_label_is_hover_revealed_like_buttons(widget):
     w, root = widget
     # At rest the version label is invisible (foreground == background)…

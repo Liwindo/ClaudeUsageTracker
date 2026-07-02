@@ -1198,10 +1198,15 @@ class Widget:
         self._set_divider()
 
         li = next((li for li in data.limits if li.key == "five_hour"), None)
-        self._var_ft.set(
-            tr("widget.status.reset_in", countdown=li.reset_countdown)
-            if li else tr("widget.status.active")
-        )
+        if li is None:
+            status = tr("widget.status.active")
+        elif li.resets_in_seconds <= 0:
+            # The 5 h window has ended; claude.ai starts a new one only with
+            # the first token use, so there is no countdown to show.
+            status = tr("widget.status.waiting_first_message")
+        else:
+            status = tr("widget.status.reset_in", countdown=li.reset_countdown)
+        self._var_ft.set(status)
         self._set_dot_color(_reset_color(li))
         # Re-evaluate the peak-hour banner on every poll (manual or scheduled)
         # so a clock change is reflected within the poll interval, not the

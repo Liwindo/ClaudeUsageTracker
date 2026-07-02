@@ -1,6 +1,6 @@
 """Parsing of the reverse-engineered /usage response."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from claude_usage_monitor.models import LimitInfo, UsageData
 
@@ -74,3 +74,14 @@ def test_highest_and_session_percent():
 def test_reset_countdown_format():
     info = li()
     assert info.reset_countdown  # never empty, never raises
+
+
+def test_reset_countdown_expired_is_plain_zero():
+    # Callers decide what an expired window means (the widget shows its own
+    # "waiting for first message" state); the countdown itself must stay a
+    # duration and never a sentence fragment like "resetting…".
+    info = LimitInfo(
+        key="five_hour", label="x", percent=0,
+        resets_at=datetime.now(tz=timezone.utc) - timedelta(hours=1),
+    )
+    assert info.reset_countdown == "0m"

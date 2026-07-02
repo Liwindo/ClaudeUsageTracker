@@ -5,6 +5,10 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+### 🐛 Bug fixes
+
+- When the 5-hour session window has ended and the next one hasn't started yet, the widget footer now says "Waiting for first message" (translated into all 9 languages) instead of the garbled "reset resetting…". A new session only begins with your first message, so there is no countdown to show in that state.
+
 ## 1.5.1 — 2026-07-01
 
 ### 🐛 Bug fixes
