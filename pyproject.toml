@@ -15,7 +15,7 @@ dependencies = [
     "Pillow>=12.2.0",
     "plyer>=2.1",
     "tomli-w>=1.2.0",
-    "tzdata>=2026.2",
+    "tzdata>=2026.3",
 ]
 
 [project.scripts]
