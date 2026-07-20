@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ClaudeUsageTracker.Tests/ClaudeUsageTracker.Tests.csproj" />
+  <Project Path="ClaudeUsageTracker/ClaudeUsageTracker.csproj" />
+</Solution>
