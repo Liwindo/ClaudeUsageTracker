@@ -14,9 +14,10 @@ public class SystemIntegrationTests
     [Fact]
     public void AutostartSyncCreatesAndRemovesTheRunEntry()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
-        Assert.NotNull(key);
-        var original = key!.GetValue(ValueName);
+        // CreateSubKey: a fresh user profile (GitHub CI runner) has no Run key
+        // yet — mirrors what Autostart.Sync(true) does.
+        using var key = Registry.CurrentUser.CreateSubKey(RunKey);
+        var original = key.GetValue(ValueName);
         try
         {
             Autostart.Sync(true);

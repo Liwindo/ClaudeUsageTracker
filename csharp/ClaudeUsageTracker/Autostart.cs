@@ -26,21 +26,22 @@ public static class Autostart
 
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
-            if (key is null)
-            {
-                Log.Warning("autostart", "Could not open the HKCU Run key.");
-                return;
-            }
             if (enabled)
             {
+                // CreateSubKey, not OpenSubKey: a fresh user profile (e.g. a CI
+                // runner) has no Run key yet — enabling must create it.
+                using var key = Registry.CurrentUser.CreateSubKey(RunKey);
                 key.SetValue(ValueName, $"\"{exePath}\"", RegistryValueKind.String);
                 Log.Info("autostart", $"Autostart entry set: {exePath}");
             }
-            else if (key.GetValue(ValueName) is not null)
+            else
             {
-                key.DeleteValue(ValueName, throwOnMissingValue: false);
-                Log.Info("autostart", "Autostart entry removed.");
+                using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+                if (key?.GetValue(ValueName) is not null)
+                {
+                    key.DeleteValue(ValueName, throwOnMissingValue: false);
+                    Log.Info("autostart", "Autostart entry removed.");
+                }
             }
         }
         catch (Exception exc)
