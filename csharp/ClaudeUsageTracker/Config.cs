@@ -40,7 +40,7 @@ public sealed class Config
             return fresh;
         }
 
-        var model = Toml.ToModel(File.ReadAllText(resolved));
+        var model = TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(resolved))!;
 
         var cfg = new Config
         {
@@ -115,7 +115,7 @@ public sealed class Config
                 table[key] = value;
             }
         }
-        File.WriteAllText(_path, Toml.FromModel(table));
+        File.WriteAllText(_path, TomlSerializer.Serialize(table));
     }
 
     private static string GetString(TomlTable model, string key, string fallback) =>
