@@ -1,9 +1,15 @@
-name: CI
+name: CI (Python)
 
+# Path-filtered to the Python variant plus everything shared (scripts/,
+# workflows). csharp/-only changes run ci-csharp.yml instead — which also
+# means nuget Dependabot PRs never reach the automerge job below and stay
+# open for manual review (deliberate).
 on:
   push:
     branches: [master]
+    paths: ['python/**', 'scripts/**', '.github/**']
   pull_request:
+    paths: ['python/**', 'scripts/**', '.github/**']
 
 permissions:
   contents: read
@@ -11,6 +17,9 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: python
     steps:
       - uses: actions/checkout@v7
 
@@ -29,9 +38,12 @@ jobs:
       # GitHub API, version-free pin comments, dependabot.yml coverage, and
       # the .python-version pin. See the script docstring for the full list.
       - name: Validate dependency pins and supply chain
-        run: uv run python scripts/validate_dependencies.py
+        run: uv run python ../scripts/validate_dependencies.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify C# locale catalogs match the Python source
+        run: uv run python ../scripts/export_locales.py --check
 
       - name: Byte-compile sources
         run: uv run python -m compileall -q src/claude_usage_monitor
@@ -45,6 +57,9 @@ jobs:
   build-exe:
     if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: python
     steps:
       - uses: actions/checkout@v7
 

@@ -13,7 +13,7 @@ echo.
 
 REM --- Step 1: CHANGELOG guard (same rule the GitHub release enforces) ---
 echo [1/5] Checking CHANGELOG.md for the current version's notes...
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_changelog.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File ..\scripts\check_changelog.ps1
 if errorlevel 1 (
     echo.
     echo   ERROR: CHANGELOG guard failed ^(see message above^).

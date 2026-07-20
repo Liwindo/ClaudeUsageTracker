@@ -9,7 +9,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# Monorepo root (this file lives in python/tests/, the script in scripts/).
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 spec = importlib.util.spec_from_file_location(
     "validate_dependencies", REPO_ROOT / "scripts" / "validate_dependencies.py"
@@ -171,6 +172,7 @@ GOOD_DEPENDABOT = (
     "      - dependency-name: pyinstaller\n"
     '        update-types: ["version-update:semver-major"]\n'
     "  - package-ecosystem: github-actions\n"
+    "  - package-ecosystem: nuget\n"
 )
 
 
@@ -196,12 +198,14 @@ def test_missing_dependabot_config_is_a_finding(tmp_path):
 # --- check_python_pin ---------------------------------------------------------
 
 def test_matching_python_pin_passes(tmp_path):
-    (tmp_path / ".python-version").write_text("3.14.4\n", encoding="utf-8")
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / ".python-version").write_text("3.14.4\n", encoding="utf-8")
     assert vd.check_python_pin(tmp_path, running="3.14.4") == []
 
 
 def test_mismatching_python_pin_is_a_finding(tmp_path):
-    (tmp_path / ".python-version").write_text("3.14.4\n", encoding="utf-8")
+    (tmp_path / "python").mkdir()
+    (tmp_path / "python" / ".python-version").write_text("3.14.4\n", encoding="utf-8")
     findings = vd.check_python_pin(tmp_path, running="3.12.1")
     assert len(findings) == 1
     assert "3.12.1" in findings[0]

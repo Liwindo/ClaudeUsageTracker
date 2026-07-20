@@ -1,7 +1,13 @@
 name: Release
 
-# Pushing a tag like v1.4.0 runs the tests, builds the EXE, and publishes
-# a GitHub release with the EXE attached and auto-generated notes.
+# Pushing a tag like v2.1.0 tests and builds BOTH variants and publishes one
+# GitHub release with four assets:
+#   ClaudeUsageTracker.exe                   Python variant (portable)
+#   ClaudeUsageTracker-Setup-X.Y.Z.exe       C# variant (per-user installer)
+#   ClaudeUsageTracker-Portable-X.Y.Z.exe    C# variant (self-contained)
+#   SHA256SUMS.txt                           checksums of the three EXEs
+# The asset name scheme is API: both variants' update checkers and the README
+# download links depend on it — never rename, only add.
 on:
   push:
     tags: ['v*']
@@ -10,12 +16,29 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  # Guards first: no build runs for a tag whose CHANGELOG section is missing
+  # or whose version is not carried by BOTH variants.
+  notes:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # full history so the previous tag can be resolved
+
+      - name: Verify both variants carry the tag's version
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $init = Get-Content python/src/claude_usage_monitor/__init__.py -Raw
+          $py = [regex]::Match($init, '__version__ = "([^"]+)"').Groups[1].Value
+          $csproj = [xml](Get-Content csharp/ClaudeUsageTracker/ClaudeUsageTracker.csproj -Raw)
+          $cs = $csproj.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($py -ne $version -or $cs -ne $version) {
+            Write-Error ("Tag v$version does not match the sources: python=$py csharp=$cs. " +
+              "Run scripts/bump_version.ps1 $version, commit, then re-tag.")
+            exit 1
+          }
+          Write-Host "Version lockstep OK: tag=$version python=$py csharp=$cs"
 
       # Guard: extract this version's section from CHANGELOG.md. The release
       # FAILS if no section exists — a release can never ship with only the
@@ -44,6 +67,20 @@ jobs:
           Write-Host "Release notes for ${version}:"
           Get-Content release_notes.md
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release_notes.md
+
+  build-python:
+    needs: notes
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+
       # Non-immutable actions: pinned to commit SHAs (CodeQL supply-chain
       # hardening — tags can be moved, SHAs cannot).
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -57,10 +94,77 @@ jobs:
       - name: Build EXE
         run: uv run pyinstaller ClaudeUsageTracker.spec --noconfirm
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-exe
+          path: python/dist/ClaudeUsageTracker.exe
+          if-no-files-found: error
+
+  build-csharp:
+    needs: notes
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Inno Setup 6
+        run: choco install innosetup -y --no-progress
+
+      # Runs the xunit suite as a gate, publishes both payloads, and compiles
+      # the installer.
+      - name: Build installer and portable EXE
+        shell: pwsh
+        run: csharp\build-release.ps1
+
+      # build-release.ps1 only WARNS and skips the installer when ISCC is
+      # missing — a release without the Setup asset must fail instead.
+      - name: Verify both artifacts exist
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          foreach ($name in @("ClaudeUsageTracker-Setup-$version.exe",
+                              "ClaudeUsageTracker-Portable-$version.exe")) {
+            if (-not (Test-Path "csharp/dist/$name")) {
+              Write-Error "csharp/dist/$name missing after build"
+              exit 1
+            }
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: csharp-exes
+          path: csharp/dist/ClaudeUsageTracker-*.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [notes, build-python, build-csharp]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+
+      - name: Generate SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $exes = Get-ChildItem assets -Recurse -Filter *.exe | Sort-Object Name
+          $lines = $exes | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          }
+          # ASCII content; no BOM so sha256sum-style tools can read it.
+          [IO.File]::WriteAllLines("$PWD/SHA256SUMS.txt", $lines)
+          Get-Content SHA256SUMS.txt
+
       - name: Publish release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          files: dist/ClaudeUsageTracker.exe
+          files: |
+            assets/python-exe/ClaudeUsageTracker.exe
+            assets/csharp-exes/ClaudeUsageTracker-*.exe
+            SHA256SUMS.txt
           # Body comes exclusively from CHANGELOG.md (+ compare link) — no
           # auto-generated notes, no contributor credits.
-          body_path: release_notes.md
+          body_path: assets/release-notes/release_notes.md

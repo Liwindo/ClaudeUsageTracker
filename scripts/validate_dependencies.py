@@ -21,10 +21,10 @@ Checks, per component:
       prose comments, so any version there goes stale on the next bump.
 
   Dependabot config (.github/dependabot.yml)
-    - Still covers both the "uv" and "github-actions" ecosystems, and still
-      ignores pyinstaller major bumps (those need a manual spec-file review).
+    - Still covers the "uv", "github-actions" and "nuget" ecosystems, and
+      still ignores pyinstaller major bumps (need a manual spec-file review).
 
-  Python toolchain (.python-version)
+  Python toolchain (python/.python-version)
     - The interpreter running this script matches the pin exactly. The pin is
       load-bearing: GitHub runners' default Python has an OpenSSL TLS
       fingerprint that Cloudflare blocks with 403 on claude.ai requests.
@@ -192,7 +192,7 @@ def check_dependabot_config(root: Path) -> list[str]:
     if not path.is_file():
         return [f"{path.name}: missing — Dependabot is not configured"]
     text = path.read_text(encoding="utf-8")
-    for ecosystem in ("uv", "github-actions"):
+    for ecosystem in ("uv", "github-actions", "nuget"):
         if not re.search(rf"package-ecosystem:\s*{ecosystem}\b", text):
             findings.append(
                 f"{path.name}: ecosystem '{ecosystem}' is no longer covered —"
@@ -207,7 +207,7 @@ def check_dependabot_config(root: Path) -> list[str]:
 
 
 def check_python_pin(root: Path, running: str | None = None) -> list[str]:
-    path = root / ".python-version"
+    path = root / "python" / ".python-version"
     if not path.is_file():
         return [
             ".python-version: missing — without the pin, GitHub runners use a"
