@@ -1,17 +1,14 @@
-# Claude Usage Tracker
+# Claude Usage Tracker — Python variant
 
-[![CI](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Liwindo/ClaudeUsageTracker/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/Liwindo/ClaudeUsageTracker?logo=github)](../../releases/latest)
-[![License: MIT](https://img.shields.io/github/license/Liwindo/ClaudeUsageTracker)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
-![Languages](https://img.shields.io/badge/🌐_languages-9-2ea44f)
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Floating widget" width="300">
+  <img src="../docs/screenshot.png" alt="Floating widget" width="300">
 </p>
 
-A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left. The interface is available in 9 languages and follows your Windows display language automatically.
+The original Python/tkinter build of the tracker: a lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background. The interface is available in 9 languages and follows your Windows display language automatically.
+
+Not sure which variant you want? See ["Which version is for me?"](../README.md#which-version-is-for-me) in the repository README.
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
@@ -19,12 +16,12 @@ A lightweight Windows system-tray app that tracks your [claude.ai](https://claud
 
 **Option A — Download the EXE (no Python required)**
 
-1. Download `ClaudeUsageTracker.exe` from the [latest release](../../releases/latest)
+1. Download `ClaudeUsageTracker.exe` from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest)
 2. Double-click it — it starts in the system tray
 
 **Option B — Build from source**
 
-Install [uv](https://docs.astral.sh/uv/), clone the repo, and run `build_exe.bat`. The script handles everything; the EXE ends up in `dist\ClaudeUsageTracker.exe`.
+Install [uv](https://docs.astral.sh/uv/), clone the repo, and run `build_exe.bat` in this `python/` directory. The script handles everything; the EXE ends up in `python\dist\ClaudeUsageTracker.exe`.
 
 ## How it works
 
@@ -118,7 +115,7 @@ build_exe.bat          # incremental EXE build (~10 s with cache)
 build_exe_clean.bat    # clean rebuild from scratch (~30 s)
 ```
 
-CI runs the tests on every push and pull request. Pushing a `v*` tag builds the EXE and publishes a GitHub release automatically, using the matching section of [CHANGELOG.md](CHANGELOG.md) as release notes — the release fails if that section is missing.
+CI runs the tests on every push and pull request. Pushing a `v*` tag builds both variants and publishes a GitHub release automatically, using the matching section of [CHANGELOG.md](../CHANGELOG.md) as release notes — the release fails if that section is missing.
 
 ## Troubleshooting
 
@@ -155,7 +152,7 @@ src/claude_usage_monitor/
 └── assets/              Application icons (logo.png, logo.ico)
 ```
 
-Tests live in `tests/`; CI and release workflows in `.github/workflows/`.
+Tests live in `tests/`; CI and release workflows in `../.github/workflows/`. The locale catalogs under `locales/` are the single source for BOTH variants' translations — `scripts/export_locales.py --check` (repo root) fails CI if the C# catalogs drift.
 
 ## License
 
