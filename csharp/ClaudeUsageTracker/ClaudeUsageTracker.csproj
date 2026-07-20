@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- The EXE/process name keeps the CS suffix as technical identity next to
+         the Python variant's ClaudeUsageTracker.exe (uninstall taskkill,
+         autostart Run values, process lists). Everything the user reads —
+         product name, file description, installer, shortcuts — says plain
+         "Claude Usage Tracker". -->
+    <AssemblyName>ClaudeUsageTrackerCS</AssemblyName>
+    <Product>Claude Usage Tracker</Product>
+    <AssemblyTitle>Claude Usage Tracker</AssemblyTitle>
+    <Company>Liwindo</Company>
+    <RootNamespace>ClaudeUsageTracker</RootNamespace>
+    <!-- Version single source for the whole app; the update checker reads this. -->
+    <Version>2.1.0</Version>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Long-running tray app: trade a little throughput for a smaller heap. -->
+    <TieredPGO>true</TieredPGO>
+    <!-- Autostart tool: precompile to native so the first frame is up fast.
+         Costs ~2–3 MB of EXE for a markedly quicker cold start. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 0–9; higher = GC keeps less memory reserved. The tracker idles 99 % of
+         the time, so a lean heap matters more than allocation throughput. -->
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WPF and WinForms coexist here (WinForms only for NotifyIcon); drop the
+         WinForms/GDI+ implicit global usings so WPF type names stay unambiguous. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Locales\*.json" />
+    <Resource Include="Assets\logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <!-- WinHTTP stack: Cloudflare accepts its TLS fingerprint on claude.ai;
+         the default SocketsHttpHandler gets a 403 challenge on every request
+         (verified empirically — do not switch back without re-testing). -->
+    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="9.0.0" />
+    <!-- Pin the native SQLite bundle above the vulnerable 2.1.x that
+         Microsoft.Data.Sqlite 9.0.0 references transitively (GHSA-2m69-gcr7-jv3q). -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
+    <PackageReference Include="Tomlyn" Version="0.17.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClaudeUsageTracker.Tests" />
+  </ItemGroup>
+
+</Project>

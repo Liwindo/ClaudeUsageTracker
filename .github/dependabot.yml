@@ -2,7 +2,7 @@
 version: 2
 updates:
   - package-ecosystem: uv
-    directory: "/"
+    directory: "/python"
     schedule:
       interval: weekly
       day: monday
@@ -13,6 +13,18 @@ updates:
     ignore:
       - dependency-name: pyinstaller
         update-types: ["version-update:semver-major"]
+
+  # NuGet bumps for the C# variant. No automerge: ci-csharp.yml runs the
+  # xunit suite on these PRs, but merging stays a manual review step.
+  - package-ecosystem: nuget
+    directory: "/csharp"
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      nuget-packages:
+        patterns:
+          - "*"
 
   # Keeps the SHA-pinned actions in ci.yml / release.yml current —
   # Dependabot bumps the SHA and the version comment together.

@@ -6,8 +6,9 @@
     Mirrors the release guard in .github/workflows/release.yml so a LOCAL build
     is held to the same standard: an EXE is never produced for a version that
     has no user-facing release notes. The version is read from
-    src/claude_usage_monitor/__init__.py (the single source of truth that the
-    built EXE reports) unless -Version is supplied. Prints the extracted notes
+    python/src/claude_usage_monitor/__init__.py (the single source of truth
+    that the built EXE reports; scripts/bump_version.ps1 keeps the C# variant
+    in lockstep) unless -Version is supplied. Prints the extracted notes
     on success; exits 1 on a missing/empty section.
 #>
 param(
@@ -17,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot   # repo root (scripts/..)
 
 if (-not $Version) {
-    $initPath = Join-Path $root 'src/claude_usage_monitor/__init__.py'
+    $initPath = Join-Path $root 'python/src/claude_usage_monitor/__init__.py'
     $initText = Get-Content $initPath -Raw -Encoding UTF8
     $vm = [regex]::Match($initText, '__version__\s*=\s*"([^"]+)"')
     if (-not $vm.Success) {
