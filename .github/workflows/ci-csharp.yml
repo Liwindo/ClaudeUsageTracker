@@ -20,7 +20,7 @@ jobs:
 
       # GitHub-owned action: immutable releases, tag pin is fine (same policy
       # as actions/checkout, enforced by scripts/validate_dependencies.py).
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
