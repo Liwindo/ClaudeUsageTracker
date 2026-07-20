@@ -5,6 +5,12 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 2.1.1 — 2026-07-21
+
+### 🐛 Bug fixes
+
+- **The tray tooltip no longer shows a bogus third "Unknown (spend)" entry behind the session and weekly values.** claude.ai's usage response recently gained a `spend` object (credit-balance metadata, not a usage limit); both variants mistook every non-`extra_usage` object for a usage bucket and rendered it with the generic "Unknown (…)" label. A response object is now only treated as a bucket when it carries a real utilization value, so genuinely new limit buckets still appear while metadata like `spend` is ignored.
+
 ## 2.1.0 — 2026-07-20
 
 The tracker now ships in **two variants** in every release — pick one on the ["Which version is for me?"](https://github.com/Liwindo/ClaudeUsageTracker#which-version-is-for-me) table. Both monitor the same claude.ai limits and read the same Firefox cookies; they share one version number from now on (which is why the Python variant jumps from 1.5.2 straight to 2.1.0).

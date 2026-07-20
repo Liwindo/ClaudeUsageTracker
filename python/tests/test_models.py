@@ -63,6 +63,23 @@ def test_from_api_response_skips_extra_usage_and_nulls():
     assert "seven_day" not in keys
 
 
+def test_from_api_response_skips_metadata_objects_without_utilization():
+    # The live /usage response carries sibling metadata objects that are not
+    # usage buckets — `spend` (added 2026-07) and `extra_usage` are both JSON
+    # objects but have no numeric utilization. They must not leak into the
+    # tooltip as an "Unknown (…)" bucket (regression: `spend` showed up as
+    # "Unknown (spend)" behind the weekly value).
+    data = UsageData.from_api_response({
+        "five_hour": {"utilization": 69, "resets_at": None},
+        "seven_day": {"utilization": 49, "resets_at": None},
+        "spend": {"used": {"amount_minor": 0}, "percent": 0, "enabled": False},
+        "extra_usage": {"is_enabled": False, "utilization": None},
+    })
+    keys = [x.key for x in data.limits]
+    assert keys == ["five_hour", "seven_day"]
+    assert "spend" not in keys
+
+
 def test_highest_and_session_percent():
     data = UsageData(limits=[li("five_hour", 30), li("seven_day", 80)])
     assert data.highest_percent == 80

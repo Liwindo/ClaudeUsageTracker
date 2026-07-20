@@ -117,18 +117,26 @@ public sealed class UsageData
     public string SubscriptionTier { get; init; } = "unknown";
 
     /// <summary>Parse the raw /usage JSON into a UsageData instance.
-    /// Every non-null object bucket is included — unknown keys get a generic
-    /// "Unknown (…)" label so nothing silently disappears if Anthropic adds
-    /// new buckets. Only the non-bucket key `extra_usage` is skipped.
+    /// A real usage bucket is an object carrying a non-null <c>utilization</c>.
+    /// Unknown *bucket* keys still get a generic "Unknown (…)" label so nothing
+    /// silently disappears if Anthropic adds new buckets — but sibling metadata
+    /// objects in the same response (<c>extra_usage</c>, <c>spend</c>, …) are
+    /// objects too with no usable utilization, and must be skipped so they
+    /// never leak into the tooltip as an "Unknown (…)" bucket.
     /// REVERSE-ENGINEERED: schema inferred from real response.</summary>
     public static UsageData FromApiResponse(JsonElement payload, string subscriptionTier = "unknown")
     {
         var limits = new List<LimitInfo>();
         foreach (var property in payload.EnumerateObject())
         {
-            if (property.Name == "extra_usage")
-                continue;
             if (property.Value.ValueKind is not JsonValueKind.Object)
+                continue;
+            // Presence of a non-null utilization is what marks a genuine bucket
+            // (five_hour, seven_day, future codenames) apart from metadata
+            // objects like `spend` (no utilization) or `extra_usage`
+            // (utilization: null).
+            if (!property.Value.TryGetProperty("utilization", out var util) ||
+                util.ValueKind is JsonValueKind.Null)
                 continue;
             limits.Add(LimitInfo.FromApi(property.Name, property.Value));
         }

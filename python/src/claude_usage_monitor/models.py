@@ -114,19 +114,24 @@ class UsageData:
     ) -> UsageData:
         """Parse the raw /usage JSON into a UsageData instance.
 
-        Every non-null dict bucket is included — unknown keys get a generic
-        "Unknown (…)" label so nothing silently disappears if Anthropic adds
-        new buckets. Only the non-bucket key `extra_usage` is skipped.
+        A real usage bucket is a dict carrying a non-null ``utilization``.
+        Unknown *bucket* keys still get a generic "Unknown (…)" label so
+        nothing silently disappears if Anthropic adds new buckets — but sibling
+        metadata objects in the same response (``extra_usage``, ``spend``, …)
+        are dicts too with no usable utilization, and must be skipped so they
+        never leak into the UI as an "Unknown (…)" bucket.
         REVERSE-ENGINEERED: schema inferred from real response.
         """
         limits: list[LimitInfo] = []
 
         for key, value in payload.items():
-            if key == "extra_usage":
-                continue
-            if value is None:
-                continue
             if not isinstance(value, dict):
+                continue
+            # Presence of a non-null utilization is what marks a genuine bucket
+            # (five_hour, seven_day, future codenames) apart from metadata
+            # objects like `spend` (no utilization) or `extra_usage`
+            # (utilization: null).
+            if value.get("utilization") is None:
                 continue
             limits.append(LimitInfo.from_api(key, value))
 

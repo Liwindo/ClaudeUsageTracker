@@ -82,6 +82,27 @@ public class ModelsTests
     }
 
     [Fact]
+    public void FromApiResponseSkipsMetadataObjectsWithoutUtilization()
+    {
+        // The live /usage response carries sibling metadata objects that are
+        // not usage buckets — `spend` (added 2026-07) and `extra_usage` are
+        // both JSON objects but have no numeric utilization. They must not leak
+        // into the tooltip as an "Unknown (…)" bucket (regression: `spend`
+        // showed up as "Unknown (spend)" behind the weekly value).
+        var data = UsageData.FromApiResponse(Json("""
+            {
+              "five_hour": {"utilization": 69, "resets_at": null},
+              "seven_day": {"utilization": 49, "resets_at": null},
+              "spend": {"used": {"amount_minor": 0}, "percent": 0, "enabled": false},
+              "extra_usage": {"is_enabled": false, "utilization": null}
+            }
+            """));
+        var keys = data.Limits.Select(x => x.Key).ToList();
+        Assert.Equal(["five_hour", "seven_day"], keys);
+        Assert.DoesNotContain("spend", keys);
+    }
+
+    [Fact]
     public void KnownBucketsSortBeforeUnknown()
     {
         var data = UsageData.FromApiResponse(Json("""
