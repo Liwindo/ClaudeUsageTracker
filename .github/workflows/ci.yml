@@ -1,9 +1,9 @@
 name: CI (Python)
 
 # Path-filtered to the Python variant plus everything shared (scripts/,
-# workflows). csharp/-only changes run ci-csharp.yml instead — which also
-# means nuget Dependabot PRs never reach the automerge job below and stay
-# open for manual review (deliberate).
+# workflows). csharp/-only changes run ci-csharp.yml instead, which has its
+# own matching automerge job — so python/, actions and nuget Dependabot PRs
+# all auto-merge patch/minor bumps once their tests pass.
 on:
   push:
     branches: [master]
