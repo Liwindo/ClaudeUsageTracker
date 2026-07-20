@@ -24,6 +24,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      # dotnet test builds both projects and runs the xunit suite — the gate
+      # the automerge job below depends on (it caught the Tomlyn 2.x break).
       - name: Run tests
         run: dotnet test csharp/ClaudeUsageTracker.slnx --nologo
 
@@ -31,3 +33,29 @@ jobs:
       # stdlib-only script, the runner's default Python is fine here.
       - name: Verify C# locale catalogs match the Python source
         run: python scripts/export_locales.py --check
+
+  # Auto-merge Dependabot nuget PRs once the test job passes — mirrors the
+  # automerge job in ci.yml so csharp/ bumps get the same treatment as
+  # python/ and actions bumps. Only patch/minor merge automatically; major
+  # bumps stay open for manual review (e.g. the Tomlyn 0.17→2.x rewrite that
+  # needed a code migration).
+  automerge:
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        # Non-immutable action: pinned to a commit SHA (same policy/pin as
+        # ci.yml; scripts/validate_dependencies.py verifies it).
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Merge patch/minor bumps
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --squash --delete-branch "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
