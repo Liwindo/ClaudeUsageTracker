@@ -5,6 +5,26 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+## 2.1.0 — 2026-07-20
+
+The tracker now ships in **two variants** in every release — pick one on the ["Which version is for me?"](https://github.com/Liwindo/ClaudeUsageTracker#which-version-is-for-me) table. Both monitor the same claude.ai limits and read the same Firefox cookies; they share one version number from now on (which is why the Python variant jumps from 1.5.2 straight to 2.1.0).
+
+### ✨ C# variant (new)
+
+- First release of the C#/.NET 10 port, available two ways:
+  - `ClaudeUsageTracker-Setup-2.1.0.exe` — per-user installer (no admin rights): Start-menu entry, optional autostart, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link.
+  - `ClaudeUsageTracker-Portable-2.1.0.exe` — everything in a single EXE, no installation, no dependencies.
+- What it adds over the Python variant: a **settings dialog** (no more hand-editing config.toml), **clickable notifications** (click → claude.ai, missed ones land in the Action Center), an **instant re-poll** after standby resume or network return (offline it doesn't poll at all), efficiency mode (EcoQoS), per-monitor DPI sharpness, edge snapping, animated bars — and a smaller memory footprint.
+- Runs side by side with the Python variant: own config folder (`%APPDATA%\claude-usage-tracker-cs`), own autostart entry, own process name.
+
+### 🐍 Python variant
+
+- No functional changes — `ClaudeUsageTracker.exe` keeps working exactly as in 1.5.2; the version only moves in lockstep with the new C# variant.
+
+### 📦 Both
+
+- Releases now include a `SHA256SUMS.txt` with checksums of all three EXEs.
+
 ## 1.5.2 — 2026-07-02
 
 ### 🐛 Bug fixes

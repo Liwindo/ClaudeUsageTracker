@@ -20,7 +20,7 @@
     <Company>Liwindo</Company>
     <RootNamespace>ClaudeUsageTracker</RootNamespace>
     <!-- Version single source for the whole app; the update checker reads this. -->
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
     <!-- Long-running tray app: trade a little throughput for a smaller heap. -->
     <TieredPGO>true</TieredPGO>
