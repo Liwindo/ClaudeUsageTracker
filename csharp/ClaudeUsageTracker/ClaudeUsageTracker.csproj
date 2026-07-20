@@ -48,15 +48,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <!-- WinHTTP stack: Cloudflare accepts its TLS fingerprint on claude.ai;
          the default SocketsHttpHandler gets a 403 challenge on every request
          (verified empirically — do not switch back without re-testing). -->
-    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="9.0.0" />
+    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="10.0.10" />
     <!-- Pin the native SQLite bundle above the vulnerable 2.1.x that
          Microsoft.Data.Sqlite 9.0.0 references transitively (GHSA-2m69-gcr7-jv3q). -->
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
-    <PackageReference Include="Tomlyn" Version="0.17.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.4" />
+    <PackageReference Include="Tomlyn" Version="2.10.1" />
   </ItemGroup>
 
   <ItemGroup>
