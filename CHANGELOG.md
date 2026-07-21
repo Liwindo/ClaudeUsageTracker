@@ -3,6 +3,10 @@
 User-facing changes per release. The release workflow publishes the matching
 section as the GitHub release notes — **a release without an entry here fails**.
 
+This file records *what changed for users*. The behavioural contract both variants
+must satisfy — the invariants a fix establishes — lives in
+[REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
+
 ## Unreleased
 
 ### 🐛 Bug fixes

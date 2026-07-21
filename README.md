@@ -55,6 +55,11 @@ docs/      screenshots
 
 One version number covers both variants: releases are tagged `vX.Y.Z` and built by CI from the matching [CHANGELOG.md](CHANGELOG.md) section. Translations have a single source — the Python locale catalogs — and CI fails if the C# catalogs drift (`scripts/export_locales.py --check`).
 
+The behaviour both variants must share — including the invisible invariants that
+aren't obvious from the UI — is written down in [REQUIREMENTS.md](REQUIREMENTS.md).
+Any behavioural change updates it in the same PR (see its "Keeping this file
+complete" section and the pull-request checklist).
+
 ## License
 
 MIT
