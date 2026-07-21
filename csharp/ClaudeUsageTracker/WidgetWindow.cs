@@ -78,6 +78,20 @@ public sealed class WidgetWindow : Window
     private Window? _updateWindow;
     private readonly DispatcherTimer _peakTimer;
 
+    // Bottom-anchored geometry. The peak banner (and wrapped footer text) change
+    // the window height at runtime; SizeToContent=Height would keep the TOP fixed
+    // and grow the window DOWNWARD, so the widget's resting bottom corner jumps on
+    // every peak/non-peak transition. To match the Python variant (whose 1.4.1
+    // bugfix pinned the bottom edge), `_bottomAnchor` holds the authoritative
+    // screen-Y of the bottom edge — the value the user controls by dragging and
+    // the value persisted. On any height change the top is moved so the bottom
+    // stays put. `_pendingBottom` carries a restored anchor across to first layout
+    // (ActualHeight is only known then); null means migrate from a legacy top.
+    private double _bottomAnchor;
+    private bool _anchorReady;
+    private bool _adjustingTop;
+    private double? _pendingBottom;
+
     public WidgetWindow(Action onRefresh, Action onSettings, Action onQuit)
     {
         _onRefresh = onRefresh;
@@ -109,6 +123,14 @@ public sealed class WidgetWindow : Window
 
         Loaded += (_, _) =>
         {
+            // Establish the authoritative bottom anchor from the banner-free
+            // layout, BEFORE any data or peak banner grows the window, so every
+            // subsequent height change pins the bottom edge instead of moving it.
+            if (_pendingBottom is double bottom)
+                Top = WidgetGeometry.TopForBottom(bottom, ActualHeight);
+            _bottomAnchor = WidgetGeometry.BottomOf(Top, ActualHeight);
+            _anchorReady = true;
+
             // Render any snapshot that arrived before the UI was shown (the
             // first poll usually completes before the window is up).
             if (_lastError is not null)
@@ -373,8 +395,33 @@ public sealed class WidgetWindow : Window
         root.Children.Add(border);
         root.Children.Add(grip);
 
-        SizeChanged += (_, _) => UpdateBarWidths();
+        SizeChanged += (_, e) =>
+        {
+            UpdateBarWidths();
+            if (e.HeightChanged)
+                AnchorBottom();
+        };
         return root;
+    }
+
+    /// <summary>Keep the window's bottom edge pinned to <see cref="_bottomAnchor"/>
+    /// when its height changes (peak banner appearing/disappearing, footer text
+    /// wrapping): move the top up/down by the delta instead of letting
+    /// SizeToContent grow the window downward. Setting Top is a move, not a
+    /// resize, so it raises no further SizeChanged; the guard is belt-and-braces.
+    /// A no-op while the anchor is not yet established (before first layout) or
+    /// while we are the ones adjusting the top.</summary>
+    private void AnchorBottom()
+    {
+        if (!_anchorReady || _adjustingTop)
+            return;
+        var desiredTop = WidgetGeometry.TopForBottom(_bottomAnchor, ActualHeight);
+        if (Math.Abs(Top - desiredTop) > 0.5)
+        {
+            _adjustingTop = true;
+            Top = desiredTop;
+            _adjustingTop = false;
+        }
     }
 
     private static ControlTemplate BuildGripTemplate()
@@ -509,6 +556,9 @@ public sealed class WidgetWindow : Window
             return; // button already released
         }
         SnapToEdges();
+        // The user just chose a new resting place — re-anchor the bottom edge to
+        // it so a later peak-banner grow keeps this position, not a stale one.
+        _bottomAnchor = WidgetGeometry.BottomOf(Top, ActualHeight);
         SavePosition();
     }
 
@@ -790,6 +840,7 @@ public sealed class WidgetWindow : Window
         var x = SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - DefaultWidth - 16;
         var y = 16.0;
         var w = DefaultWidth;
+        double? bottom = null;
         var posFile = AppPaths.WidgetPosFilePath;
         if (File.Exists(posFile))
         {
@@ -797,12 +848,19 @@ public sealed class WidgetWindow : Window
             {
                 using var doc = JsonDocument.Parse(File.ReadAllText(posFile));
                 var root = doc.RootElement;
-                x = root.GetProperty("x").GetDouble();
-                y = root.GetProperty("y").GetDouble();
+                if (root.TryGetProperty("x", out var xEl))
+                    x = xEl.GetDouble();
                 if (root.TryGetProperty("w", out var wEl))
                     w = Math.Max(MinWidgetWidth, wEl.GetDouble());
                 if (root.TryGetProperty("minimized", out var minEl))
                     _minimized = minEl.GetBoolean();
+                // Preferred: the height-invariant bottom-edge anchor. Legacy
+                // files only stored the top ("y"); treat it as a provisional top
+                // and let first layout derive the anchor from it.
+                if (root.TryGetProperty("bottom", out var bEl))
+                    bottom = bEl.GetDouble();
+                else if (root.TryGetProperty("y", out var yEl))
+                    y = yEl.GetDouble();
             }
             catch (Exception)
             {
@@ -819,7 +877,10 @@ public sealed class WidgetWindow : Window
         {
             x = Math.Max(vx, Math.Min(x, vx + vw - 60));
             y = Math.Max(vy, Math.Min(y, vy + vh - 40));
+            if (bottom is double bv)
+                bottom = WidgetGeometry.ClampBottom(bv, vy, vh);
         }
+        _pendingBottom = bottom;
         Left = x;
         Top = y;
         Width = w;
@@ -830,13 +891,14 @@ public sealed class WidgetWindow : Window
         try
         {
             Directory.CreateDirectory(AppPaths.ConfigDir);
-            File.WriteAllText(AppPaths.WidgetPosFilePath, JsonSerializer.Serialize(new
-            {
-                x = Left,
-                y = Top,
-                w = Width,
-                minimized = _minimized,
-            }));
+            // Persist the bottom-edge anchor (height-invariant) once it exists,
+            // so restarting during peak hours cannot bake the banner height into
+            // the saved position. Before first layout, fall back to the legacy
+            // top so we never write a bogus zero anchor.
+            object payload = _anchorReady
+                ? new { x = Left, bottom = _bottomAnchor, w = Width, minimized = _minimized }
+                : new { x = Left, y = Top, w = Width, minimized = _minimized };
+            File.WriteAllText(AppPaths.WidgetPosFilePath, JsonSerializer.Serialize(payload));
         }
         catch (Exception)
         {

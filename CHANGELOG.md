@@ -5,6 +5,10 @@ section as the GitHub release notes — **a release without an entry here fails*
 
 ## Unreleased
 
+### 🐛 Bug fixes
+
+- **C# variant: the widget no longer jumps when Anthropic's peak-hour banner appears or disappears.** Its bottom edge is now anchored, so the extra banner height grows the window upward and the resting position stays put across every peak/non-peak transition — matching the Python variant (which fixed the same issue in 1.4.1). The saved position is stored as a height-invariant bottom anchor, so restarting during peak hours can no longer drift the widget.
+
 ## 2.1.1 — 2026-07-21
 
 ### 🐛 Bug fixes
