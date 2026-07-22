@@ -36,7 +36,8 @@ public sealed class TrayIcon : IDisposable
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr handle);
 
-    public TrayIcon(Action onClickOpen, Action onClickRefresh, Action onSettings, Action onQuit)
+    public TrayIcon(Action onClickOpen, Action onClickRefresh, Action onSettings,
+        Action onCheckUpdates, Action onQuit)
     {
         var menu = new ContextMenuStrip();
         // Disabled header line — shows which version is running.
@@ -52,6 +53,9 @@ public sealed class TrayIcon : IDisposable
         var settings = new ToolStripMenuItem(I18n.Tr("tray.menu.settings"));
         settings.Click += (_, _) => onSettings();
         menu.Items.Add(settings);
+        var checkUpdates = new ToolStripMenuItem(I18n.Tr("tray.menu.check_updates"));
+        checkUpdates.Click += (_, _) => onCheckUpdates();
+        menu.Items.Add(checkUpdates);
         menu.Items.Add(new ToolStripSeparator());
         var viewLog = new ToolStripMenuItem(I18n.Tr("tray.menu.view_log"));
         viewLog.Click += (_, _) => ViewLog();

@@ -35,9 +35,13 @@ Write-Host "`n[1/4] Tests" -ForegroundColor Cyan
 if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 
 Write-Host "`n[2/4] Publish framework-dependent (installer payload)" -ForegroundColor Cyan
+# InstallerUpdater=true turns on the in-app download-and-install feature — ONLY
+# for the installed build, which hands off to the per-user Inno installer. The
+# portable publish below deliberately omits it (a single-file EXE cannot safely
+# replace itself), so portable keeps the "open GitHub" path.
 & $dotnet publish $csproj -c Release -r win-x64 --self-contained false `
   /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true `
-  /p:DebugType=none -o (Join-Path $root "publish\fdd")
+  /p:InstallerUpdater=true /p:DebugType=none -o (Join-Path $root "publish\fdd")
 if ($LASTEXITCODE -ne 0) { throw "fdd publish failed" }
 
 Write-Host "`n[3/4] Publish portable (self-contained single EXE)" -ForegroundColor Cyan

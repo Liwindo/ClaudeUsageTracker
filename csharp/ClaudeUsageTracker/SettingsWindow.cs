@@ -42,6 +42,7 @@ public sealed class SettingsWindow : Window
 
     private readonly Config _config;
     private readonly Action<Config> _onApplied;
+    private readonly Action _onCheckForUpdates;
 
     private readonly TextBox _pollInterval;
     private readonly TextBox _thresholds;
@@ -53,10 +54,11 @@ public sealed class SettingsWindow : Window
     private readonly ComboBox _logLevel;
     private readonly TextBlock _error;
 
-    public SettingsWindow(Config config, Action<Config> onApplied)
+    public SettingsWindow(Config config, Action<Config> onApplied, Action onCheckForUpdates)
     {
         _config = config;
         _onApplied = onApplied;
+        _onCheckForUpdates = onCheckForUpdates;
 
         Title = I18n.Tr("settings.title");
         Background = Solid(Bg);
@@ -90,6 +92,12 @@ public sealed class SettingsWindow : Window
         root.Children.Add(_autostart);
         _updateCheck = CheckRow(I18n.Tr("settings.update_check"));
         root.Children.Add(_updateCheck);
+        // On-demand check, independent of the once-per-start automatic one and
+        // of the checkbox above. A previously "skipped" release still surfaces.
+        var checkNow = DialogButton(I18n.Tr("settings.check_updates"), primary: false, () => _onCheckForUpdates());
+        checkNow.HorizontalAlignment = HorizontalAlignment.Left;
+        checkNow.Margin = new Thickness(0, 8, 0, 0);
+        root.Children.Add(checkNow);
 
         root.Children.Add(SectionHeader(I18n.Tr("settings.section.advanced")));
         _logLevel = LogLevelBox();

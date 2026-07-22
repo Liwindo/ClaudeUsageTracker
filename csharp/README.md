@@ -31,13 +31,18 @@ ClaudeUsageTracker/        WPF app (net10.0-windows, UI entirely in code — no 
 ├─ Config.cs               TOML via Tomlyn, auto-migration of missing keys
 ├─ I18n.cs + Locales/*.json  9 languages (exported from python/, see scripts/)
 ├─ NotificationManager.cs  Thresholds + hysteresis + reset detection, live updates
-├─ UpdateCheck.cs          GitHub release check (once per start)
+├─ UpdateCheck.cs          GitHub release check (once per start + manual)
+├─ UpdateVerifier.cs       Pure trust gate: signature/digest/anti-rollback/host (shared w/ UpdateTool)
+├─ UpdateManifest.cs       Strict parser for the signed update.json
+├─ UpdateInstaller.cs      Verified download + silent per-user install + relaunch (installer build only)
+├─ UpdateKeys.json         Embedded update-signing PUBLIC key(s) — the trust anchor
 ├─ Autostart.cs            HKCU Run key "ClaudeUsageTrackerCS"
 ├─ SystemTriggers.cs       Instant poll on resume/network return
 ├─ EfficiencyMode.cs       EcoQoS (E-cores/throttling while idle)
 ├─ WorkingSetTrimmer.cs    RAM trimming for idle operation
 └─ app.manifest            Per-monitor V2 DPI
 ClaudeUsageTracker.Tests/  xunit test suite
+UpdateTool/                Offline keygen / sign / verify CLI (net10.0, links UpdateVerifier)
 installer/                 Inno Setup 6 script (per-user installer)
 ```
 
@@ -75,6 +80,56 @@ The installer's runtime detection checks the **filesystem** (`%ProgramFiles%\dot
 - Notifications use clickable NotifyIcon balloon tips (click → claude.ai). Real toast buttons were deliberately left out: they require an AppUserModelID/shortcut identity that can fail silently, while the clickable notification delivers the core benefit reliably.
 - RAM optimisations: software rendering (no D3D for a 256-px widget), `System.GC.ConserveMemory=6`, periodic working-set trimming, EcoQoS.
 - The version is maintained centrally in the csproj (`<Version>`), set by `scripts/bump_version.ps1` together with the Python variant; the update check reads it from the assembly metadata.
+
+## Secure in-app updates & release signing
+
+The installed C# build can download and install a newer release itself. The
+security model (full spec: [`REQUIREMENTS.md` §13](../REQUIREMENTS.md)) is that a
+**compromised GitHub or CI must not be able to ship an infected update**, so the
+trust anchor is an **offline signing key** whose public half is embedded in the
+app (`UpdateKeys.json`). The app installs an update only if all hold: the
+`update.json` manifest's detached signature verifies against an embedded public
+key, the installer's SHA-256 matches that signed manifest, the version is
+strictly newer (anti-rollback), and every download stays on
+`github.com`/`*.githubusercontent.com`. Any failure aborts (fail-closed). The
+portable EXE and the Python variant do not self-update.
+
+`UpdateVerifier.cs` is pure and is linked verbatim into `UpdateTool` and the CI
+`release-integrity` guard, so what the guard checks is exactly what the app
+enforces. Verified by `ClaudeUsageTracker.Tests/UpdateVerifierTests.cs`.
+
+### One-time key setup
+
+```powershell
+$env:CUT_UPDATE_KEY_PASS = '<a strong passphrase>'
+..\scripts\generate_update_key.ps1        # writes the ENCRYPTED private key OUTSIDE the repo
+```
+
+Paste the printed public key into `ClaudeUsageTracker/UpdateKeys.json`
+(`{"keys": ["<base64>"]}`) and commit **only** that. Keep the private key
+offline — it must never touch the repo or CI. The script refuses to write it
+inside the repo tree, and `.gitignore` blocks `*.pem`/`*.key` as a backstop.
+Until a key is configured, in-app auto-install is inert (fail-closed) and the
+dialog just opens GitHub.
+
+### Releasing with a signed manifest
+
+One command does the whole release; the offline key never leaves your machine:
+
+```powershell
+$env:CUT_UPDATE_KEY = '<path to your offline key>'; $env:CUT_UPDATE_KEY_PASS = '<passphrase>'
+..\scripts\release.ps1 X.Y.Z
+```
+
+`release.ps1` bumps both variants, stamps the CHANGELOG, commits/tags/pushes,
+**waits for the CI draft build**, then signs `update.json`, **self-verifies**
+against the embedded public key, uploads `update.json(.sig)`, and flips the draft
+to published. `release.yml` builds every tag as a **draft** (CI holds no signing
+key); because the update check follows `releases/latest` (drafts are invisible to
+it), a forgotten signing step can never ship an unsigned update — the release just
+stays a draft. The `release-integrity` workflow re-verifies every published
+release as a safety net. To resume just the signing step after a mid-way failure:
+`..\scripts\publish_release.ps1 -Tag vX.Y.Z`.
 
 ## License
 

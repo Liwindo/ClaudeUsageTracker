@@ -13,7 +13,20 @@ using System.Text.RegularExpressions;
 
 namespace ClaudeUsageTracker;
 
-public sealed record UpdateInfo(string LatestVersion, string Url);
+/// <summary>One asset attached to a GitHub release.</summary>
+public sealed record ReleaseAsset(string Name, string DownloadUrl);
+
+public sealed record UpdateInfo(string LatestVersion, string Url, IReadOnlyList<ReleaseAsset> Assets);
+
+public enum UpdateCheckStatus { UpToDate, Available, Failed }
+
+/// <summary>Outcome of an update check. <see cref="Info"/> is set only when
+/// <see cref="Status"/> is <see cref="UpdateCheckStatus.Available"/>.</summary>
+public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Info)
+{
+    public static readonly UpdateCheckResult UpToDate = new(UpdateCheckStatus.UpToDate, null);
+    public static readonly UpdateCheckResult Failed = new(UpdateCheckStatus.Failed, null);
+}
 
 public static partial class UpdateCheck
 {
@@ -74,13 +87,22 @@ public static partial class UpdateCheck
     }
 
     /// <summary>Return UpdateInfo if GitHub has a newer release than the
-    /// running version, else null. Never throws.</summary>
+    /// running version, else null. Never throws. Thin wrapper over
+    /// <see cref="CheckDetailed"/> for the once-per-start path.</summary>
     /// <param name="skipVersion">A version the user chose to skip via the
     /// update dialog. That exact release is silently ignored; anything newer
     /// than it still triggers the dialog.</param>
-    public static UpdateInfo? CheckForUpdate(string skipVersion = "")
+    public static UpdateInfo? CheckForUpdate(string skipVersion = "") =>
+        CheckDetailed(skipVersion).Info;
+
+    /// <summary>Query GitHub and report the outcome, distinguishing "up to
+    /// date" from "the check failed" — the manual "check now" action needs that
+    /// difference so it never claims you are current after a network error.
+    /// Never throws. Pass skipVersion="" (the default) for a manual check so a
+    /// previously-skipped release is still surfaced.</summary>
+    public static UpdateCheckResult CheckDetailed(string skipVersion = "")
     {
-        JsonDocument doc;
+        string body;
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
@@ -92,15 +114,36 @@ public static partial class UpdateCheck
             if ((int)resp.StatusCode != 200)
             {
                 Log.Info("update", $"Update check: GitHub returned {(int)resp.StatusCode}.");
-                return null;
+                return UpdateCheckResult.Failed;
             }
             using var reader = new StreamReader(resp.Content.ReadAsStream());
-            doc = JsonDocument.Parse(reader.ReadToEnd());
+            body = reader.ReadToEnd();
         }
         catch (Exception exc)
         {
             Log.Info("update", $"Update check failed: {exc.Message}");
-            return null;
+            return UpdateCheckResult.Failed;
+        }
+
+        return Evaluate(body, skipVersion, CurrentVersion);
+    }
+
+    /// <summary>Pure decision over an already-fetched release payload — no
+    /// network, so it is exhaustively unit-testable. A malformed body reads as a
+    /// failed check (never "up to date"); an equal/older/skipped tag is up to
+    /// date; a newer tag is available with its asset download URLs. Never throws.
+    /// </summary>
+    internal static UpdateCheckResult Evaluate(string body, string skipVersion, string currentVersion)
+    {
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            Log.Info("update", "Update check: response was not valid JSON.");
+            return UpdateCheckResult.Failed;
         }
 
         using (doc)
@@ -108,23 +151,23 @@ public static partial class UpdateCheck
             if (doc.RootElement.ValueKind is not JsonValueKind.Object)
             {
                 Log.Info("update", $"Update check: unexpected response shape ({doc.RootElement.ValueKind}).");
-                return null;
+                return UpdateCheckResult.Failed;
             }
 
             var tag = doc.RootElement.TryGetProperty("tag_name", out var tagEl) && tagEl.ValueKind is JsonValueKind.String
                 ? tagEl.GetString()!.Trim()
                 : "";
-            if (string.IsNullOrEmpty(tag) || !IsNewer(tag, CurrentVersion))
+            if (string.IsNullOrEmpty(tag) || !IsNewer(tag, currentVersion))
             {
-                Log.Debug("update", $"Update check: {CurrentVersion} is up to date (latest: {(tag.Length > 0 ? tag : "?")}).");
-                return null;
+                Log.Debug("update", $"Update check: {currentVersion} is up to date (latest: {(tag.Length > 0 ? tag : "?")}).");
+                return UpdateCheckResult.UpToDate;
             }
 
             var latest = tag.TrimStart('v', 'V');
             if (!string.IsNullOrEmpty(skipVersion) && latest == skipVersion.TrimStart('v', 'V'))
             {
                 Log.Info("update", $"Update {latest} available but skipped by user preference.");
-                return null;
+                return UpdateCheckResult.UpToDate;
             }
 
             var url = doc.RootElement.TryGetProperty("html_url", out var urlEl) &&
@@ -132,8 +175,29 @@ public static partial class UpdateCheck
                       !string.IsNullOrEmpty(urlEl.GetString())
                 ? urlEl.GetString()!
                 : RepoReleasesUrl;
-            Log.Info("update", $"Update available: {tag} (running {CurrentVersion}).");
-            return new UpdateInfo(latest, url);
+
+            // Asset download URLs (name → browser_download_url) for the in-app
+            // installer. Absent/odd shapes are simply skipped; the installer
+            // fails closed if a needed asset is missing.
+            var assets = new List<ReleaseAsset>();
+            if (doc.RootElement.TryGetProperty("assets", out var assetsEl) &&
+                assetsEl.ValueKind is JsonValueKind.Array)
+            {
+                foreach (var a in assetsEl.EnumerateArray())
+                {
+                    if (a.ValueKind is not JsonValueKind.Object)
+                        continue;
+                    var name = a.TryGetProperty("name", out var nEl) && nEl.ValueKind is JsonValueKind.String
+                        ? nEl.GetString() : null;
+                    var dl = a.TryGetProperty("browser_download_url", out var dEl) && dEl.ValueKind is JsonValueKind.String
+                        ? dEl.GetString() : null;
+                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(dl))
+                        assets.Add(new ReleaseAsset(name, dl));
+                }
+            }
+
+            Log.Info("update", $"Update available: {tag} (running {currentVersion}).");
+            return new UpdateCheckResult(UpdateCheckStatus.Available, new UpdateInfo(latest, url, assets));
         }
     }
 }

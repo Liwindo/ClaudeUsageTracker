@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "A language change takes effect after the next restart.",
   "settings.invalid_thresholds": "Please enter whole percentages between 0 and 100, separated by commas.",
   "settings.invalid_interval": "The poll interval must be at least 10 seconds.",
-  "toast.open_claude": "Open claude.ai"
+  "toast.open_claude": "Open claude.ai",
+  "update.download_install": "Download & install",
+  "update.downloading": "Downloading…",
+  "update.verifying": "Verifying signature…",
+  "update.installing": "Installing…",
+  "update.failed": "Update could not be verified. Please try again or download it from GitHub.",
+  "settings.check_updates": "Check for updates now",
+  "update.up_to_date": "You are running the latest version ({version}).",
+  "update.check_failed": "Could not check for updates. Please try again later.",
+  "tray.menu.check_updates": "Check for updates"
 }

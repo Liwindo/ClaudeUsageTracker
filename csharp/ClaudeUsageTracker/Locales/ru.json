@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "Смена языка вступит в силу после следующего перезапуска.",
   "settings.invalid_thresholds": "Введите целые проценты от 0 до 100 через запятую.",
   "settings.invalid_interval": "Интервал опроса должен быть не менее 10 секунд.",
-  "toast.open_claude": "Открыть claude.ai"
+  "toast.open_claude": "Открыть claude.ai",
+  "update.download_install": "Скачать и установить",
+  "update.downloading": "Загрузка…",
+  "update.verifying": "Проверка подписи…",
+  "update.installing": "Установка…",
+  "update.failed": "Не удалось проверить обновление. Повторите попытку или скачайте с GitHub.",
+  "settings.check_updates": "Проверить обновления сейчас",
+  "update.up_to_date": "У вас последняя версия ({version}).",
+  "update.check_failed": "Не удалось проверить обновления. Повторите попытку позже.",
+  "tray.menu.check_updates": "Проверить обновления"
 }

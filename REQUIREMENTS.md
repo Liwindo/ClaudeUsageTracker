@@ -70,9 +70,11 @@ variant's head will be lost again.
 
 ## 3. Networking & resilience
 
-- **R-net-1** — The app talks to exactly two external hosts: `claude.ai` (usage
-  data) and `api.github.com` / `github.com` (update check + opening the release
-  page). No other outbound requests. See also §10. *Origin: Privacy section.*
+- **R-net-1** — The app talks only to: `claude.ai` (usage data),
+  `api.github.com` / `github.com` (update check + opening the release page), and
+  — only when the user starts an in-app update (§13) — the GitHub release asset
+  hosts `github.com` / `*.githubusercontent.com` to download the signed manifest
+  and installer. No other outbound requests. See also §10. *Origin: Privacy section.*
 - **R-net-2** — claude.ai endpoints and response schemas are **reverse-engineered
   and undocumented**; code touching them MUST stay marked `REVERSE-ENGINEERED`
   and MUST degrade gracefully (no crash) when the schema changes.
@@ -190,6 +192,14 @@ variant's head will be lost again.
 - **R-life-4** — The update checker compares against the latest GitHub release
   tag; a tag higher than the running version shows every user an update dialog,
   so a tag MUST never be pushed without bumping the version first.
+- **R-life-5** — Both variants MUST offer an **on-demand "Check for updates"**
+  action in the tray menu, independent of the once-per-start check and of the
+  `update_check` config value. A manual check MUST distinguish three outcomes:
+  a newer release (show the update dialog), up-to-date, and check-failed — a
+  network error MUST NOT be reported as "up to date". It MUST ignore
+  `skip_update_version` so a previously-skipped release still surfaces on an
+  explicit check. *Origin: this file. Verified by: `UpdateCheckTests.Evaluate*`
+  (C#) / `test_update_check.py` `evaluate_release` / `check_detailed` tests (Py).*
 
 ## 10. Privacy & security
 
@@ -226,3 +236,57 @@ variant's head will be lost again.
 - **R-rel-5** — Local and CI builds MUST run the same quality gates
   (changelog check, byte-compile/build, full test suite) so a build can't ship
   stale or untested code. *Origin: 1.4.3.*
+
+## 13. In-app update download & install
+
+*variant-specific (C# installer build).* The **portable** C# EXE and the
+**Python** variant MUST NOT self-update; they keep the "open GitHub" path
+(self-replacing an arbitrarily-located single-file EXE is unsafe). Auto-install
+is gated to the installed build (`INSTALLER_UPDATER`). The overriding goal:
+**a compromised GitHub account, repository, or CI MUST NOT be able to make the
+app install an attacker's build.**
+
+- **R-update-1** — The installer build MAY offer, from the update dialog, to
+  download and install a newer release. It MUST do so only after the user
+  explicitly starts it (no silent/background auto-update). *Verified by: real
+  install run (GUI/OS) — see CHANGELOG Unreleased; `UpdateVerifierTests`.*
+- **R-update-2** — An update MUST be installed only if a detached signature over
+  the exact `update.json` manifest bytes verifies against a **public key embedded
+  in the app** (`UpdateKeys.json`), using an **offline** private key that never
+  exists in the repo or CI. A tampered manifest or a signature from any other key
+  MUST be refused. This is the anchor that a checksum file cannot provide (whoever
+  can replace the installer can replace its checksum). *Verified by:
+  `UpdateVerifierTests` (tamper/untrusted-key/malformed) + `UpdateTool` roundtrip.*
+- **R-update-3** — The downloaded installer's bytes MUST match the SHA-256 and
+  size recorded in the **signed** manifest (constant-time compare) before it is
+  executed. *Verified by: `UpdateVerifierTests.DownloadedBytesMustMatchSignedDigest`.*
+- **R-update-4** — **Anti-rollback:** the manifest version MUST be strictly newer
+  than the running version; an equal or older version MUST be refused even if
+  validly signed. *Verified by: `UpdateVerifierTests.EqualOrOlderVersionIsRejected`.*
+- **R-update-5** — Assets MUST be downloaded only over HTTPS from
+  `github.com` / `*.githubusercontent.com`; every redirect hop MUST be
+  re-validated against that allow-list, downloads MUST be size-capped and
+  time-limited, and the verified installer MUST land in a fresh per-user
+  directory and be executed by that exact path (no TOCTOU window). *Verified by:
+  `UpdateVerifierTests.OnlyGithubHttpsAssetUrlsAreAllowed`; download hardening in
+  `UpdateInstaller`.*
+- **R-update-6** — **Fail closed.** Any failure (no embedded key, bad signature,
+  hash mismatch, disallowed host, missing asset, network error) MUST abort the
+  install and leave the running app untouched; with no embedded key the feature
+  is inert and no update is ever accepted. *Verified by:
+  `UpdateVerifierTests.NoEmbeddedKeyFailsClosed` and the malformed-input tests.*
+- **R-update-7** — **Signing can never be forgotten.** CI publishes every release
+  as a **draft**; the update check follows `releases/latest`, which ignores
+  drafts, so no client can see a release without a signed manifest. A release goes
+  live only through local signing with the **offline** key: `scripts/release.ps1`
+  (one command: bump → tag → push → wait for the draft → sign → publish) wrapping
+  `scripts/publish_release.ps1`, which signs, self-verifies against the embedded
+  public key, uploads `update.json(.sig)` and only then publishes. The signing key
+  is never placed in CI (an owner decision: a compromised CI must not be able to
+  sign). A CI **release-integrity** guard independently re-verifies each published
+  release with the app's own verifier and fails if it is unsigned/invalid.
+  *Verified by: `release.yml` (draft), `release.ps1`/`publish_release.ps1`
+  self-verify, `.github/workflows/release-integrity.yml`.*
+- **R-update-8** — Multiple embedded public keys MUST be supported so a key can be
+  rotated (ship a build trusting old+new before signing with the new key).
+  *Verified by: `UpdateVerifierTests.SignatureVerifiesUnderAnyEmbeddedKey`.*

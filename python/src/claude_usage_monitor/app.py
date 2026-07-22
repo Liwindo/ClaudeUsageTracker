@@ -17,7 +17,14 @@ from .models import UsageData
 from .notifications import NotificationManager
 from .poller import Poller
 from .tray import TrayIcon
-from .update_check import check_for_update
+from . import __version__
+from .i18n import tr
+from .update_check import (
+    STATUS_AVAILABLE,
+    STATUS_UP_TO_DATE,
+    check_detailed,
+    check_for_update,
+)
 from .widget import Widget
 
 logger = logging.getLogger(__name__)
@@ -36,6 +43,7 @@ class App:
         self._tray = TrayIcon(
             on_click_open=self._widget.toggle,
             on_click_refresh=self._on_refresh_requested,
+            on_check_updates=self._on_check_updates_requested,
             on_quit=self._quit,
         )
 
@@ -82,6 +90,39 @@ class App:
                 info.latest_version,
                 info.url,
                 on_skip=lambda v=info.latest_version: self._skip_update(v),
+            )
+
+    def _on_check_updates_requested(self) -> None:
+        """Manual 'Check for updates' from the tray menu. Runs the check on a
+        daemon thread and reports all three outcomes distinctly — a newer
+        release opens the update dialog, otherwise a short message says
+        up-to-date or that the check failed (so a network error never
+        masquerades as 'up to date'). Ignores the skip preference: a manual
+        check always surfaces a newer release."""
+        threading.Thread(
+            target=self._check_updates_now, daemon=True, name="update-check-manual"
+        ).start()
+
+    def _check_updates_now(self) -> None:
+        result = check_detailed(skip_version="")
+        if result.status == STATUS_AVAILABLE and result.info is not None:
+            info = result.info
+            self._widget.notify_update(
+                info.latest_version,
+                info.url,
+                on_skip=lambda v=info.latest_version: self._skip_update(v),
+            )
+        elif result.status == STATUS_UP_TO_DATE:
+            self._widget.notify_message(
+                tr("update.window_title"),
+                tr("update.up_to_date", version=__version__),
+                kind="info",
+            )
+        else:
+            self._widget.notify_message(
+                tr("update.window_title"),
+                tr("update.check_failed"),
+                kind="warning",
             )
 
     def _skip_update(self, version: str) -> None:

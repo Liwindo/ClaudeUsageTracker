@@ -14,6 +14,7 @@ import json
 import sys
 import tkinter as tk
 import webbrowser
+from tkinter import messagebox
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -494,6 +495,22 @@ class Widget:
                 "Skip version" — the dialog never reappears for this release.
         """
         self._post(self._show_update_dialog, latest_version, url, on_skip)
+
+    def notify_message(self, title: str, body: str, kind: str = "info") -> None:
+        """Show a simple modal info/warning box on the Tk thread. Thread-safe.
+
+        Used by the manual "Check for updates" action to report "up to date" or
+        "check failed" (the "available" case uses the richer update dialog).
+        """
+        self._post(self._show_message, title, body, kind)
+
+    def _show_message(self, title: str, body: str, kind: str) -> None:
+        if not self._root:
+            return
+        if kind == "warning":
+            messagebox.showwarning(title, body, parent=self._root)
+        else:
+            messagebox.showinfo(title, body, parent=self._root)
 
     def _show_update_dialog(
         self,

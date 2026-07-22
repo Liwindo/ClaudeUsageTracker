@@ -32,6 +32,20 @@ class UpdateInfo:
     url: str              # release page to open in the browser
 
 
+# Outcome of an update check, so the manual "check now" action can tell
+# "up to date" apart from "the check failed" (a network error must never be
+# reported to the user as "you are current").
+STATUS_UP_TO_DATE = "up_to_date"
+STATUS_AVAILABLE = "available"
+STATUS_FAILED = "failed"
+
+
+@dataclass
+class UpdateResult:
+    status: str                    # one of the STATUS_* constants
+    info: UpdateInfo | None = None  # set only when status == STATUS_AVAILABLE
+
+
 def _parse_version(version: str) -> tuple[int, ...]:
     """'v1.2.0' / '1.2' → (1, 2, 0) / (1, 2). Empty tuple if unparseable."""
     m = re.match(r"v?(\d+(?:\.\d+)*)", version.strip())
@@ -50,14 +64,43 @@ def _is_newer(remote: str, local: str) -> bool:
     return r + (0,) * (width - len(r)) > l + (0,) * (width - len(l))
 
 
-def check_for_update(skip_version: str = "") -> UpdateInfo | None:
-    """Return UpdateInfo if GitHub has a newer release than the running
-    version, else None. Never raises.
+def evaluate_release(
+    data: object, skip_version: str = "", current_version: str = __version__
+) -> UpdateResult:
+    """Pure decision over an already-fetched release payload — no network, so it
+    is exhaustively unit-testable. Distinguishes up-to-date from a malformed
+    response (treated as a failed check) and honours skip_version.
+    """
+    # A non-dict body (error shape, proxy page parsed as a JSON list, …) is a
+    # failed check, not "up to date".
+    if not isinstance(data, dict):
+        logger.info(
+            "Update check: unexpected response shape (%s).", type(data).__name__
+        )
+        return UpdateResult(STATUS_FAILED)
 
-    Args:
-        skip_version: A version the user chose to skip via the update dialog.
-            That exact release is silently ignored; anything newer than it
-            still triggers the dialog.
+    tag = str(data.get("tag_name", "")).strip()
+    if not tag or not _is_newer(tag, current_version):
+        logger.debug(
+            "Update check: %s is up to date (latest: %s).",
+            current_version, tag or "?",
+        )
+        return UpdateResult(STATUS_UP_TO_DATE)
+
+    latest = tag.lstrip("vV")
+    if skip_version and latest == skip_version.lstrip("vV"):
+        logger.info("Update %s available but skipped by user preference.", latest)
+        return UpdateResult(STATUS_UP_TO_DATE)
+
+    url = str(data.get("html_url") or REPO_RELEASES_URL)
+    logger.info("Update available: %s (running %s).", tag, current_version)
+    return UpdateResult(STATUS_AVAILABLE, UpdateInfo(latest_version=latest, url=url))
+
+
+def check_detailed(skip_version: str = "") -> UpdateResult:
+    """Query GitHub and report the outcome (up-to-date / available / failed).
+    Never raises. Pass skip_version="" (the default) for a manual check so a
+    previously-skipped release is still surfaced.
     """
     try:
         resp = httpx.get(
@@ -72,34 +115,23 @@ def check_for_update(skip_version: str = "") -> UpdateInfo | None:
         )
         if resp.status_code != 200:
             logger.info("Update check: GitHub returned %d.", resp.status_code)
-            return None
+            return UpdateResult(STATUS_FAILED)
         data = resp.json()
     except Exception as exc:
         logger.info("Update check failed: %s", exc)
-        return None
+        return UpdateResult(STATUS_FAILED)
 
-    # data is used outside the try above — a non-dict body (error shape, proxy
-    # page parsed as JSON list, …) would raise AttributeError and break the
-    # "never raises" contract this function promises its daemon thread.
-    if not isinstance(data, dict):
-        logger.info(
-            "Update check: unexpected response shape (%s).", type(data).__name__
-        )
-        return None
+    return evaluate_release(data, skip_version=skip_version)
 
-    tag = str(data.get("tag_name", "")).strip()
-    if not tag or not _is_newer(tag, __version__):
-        logger.debug(
-            "Update check: %s is up to date (latest: %s).",
-            __version__, tag or "?",
-        )
-        return None
 
-    latest = tag.lstrip("vV")
-    if skip_version and latest == skip_version.lstrip("vV"):
-        logger.info("Update %s available but skipped by user preference.", latest)
-        return None
+def check_for_update(skip_version: str = "") -> UpdateInfo | None:
+    """Return UpdateInfo if GitHub has a newer release than the running
+    version, else None. Never raises. Thin wrapper over check_detailed for the
+    once-per-start path.
 
-    url = str(data.get("html_url") or REPO_RELEASES_URL)
-    logger.info("Update available: %s (running %s).", tag, __version__)
-    return UpdateInfo(latest_version=latest, url=url)
+    Args:
+        skip_version: A version the user chose to skip via the update dialog.
+            That exact release is silently ignored; anything newer than it
+            still triggers the dialog.
+    """
+    return check_detailed(skip_version).info

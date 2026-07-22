@@ -1,0 +1,72 @@
+name: Release integrity
+
+# Defence-in-depth for the in-app updater: independently re-verify that every
+# PUBLISHED release carries an update manifest whose signature and installer
+# digest the shipped app would accept. It runs the SAME code the app runs
+# (csharp/UpdateTool links UpdateVerifier.cs), so it cannot drift from what the
+# app enforces.
+#
+# This catches the one gap the draft+publish_release.ps1 flow leaves open: a
+# human publishing a draft by hand via the web UI without signing. If that
+# happens, this job goes red.
+#
+# While no signing key is configured yet (UpdateKeys.json has no keys), the
+# feature is inactive and the job exits green with a notice.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: '17 6 * * *'   # daily safety net
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify the latest published release is properly signed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $keysJson = "csharp/ClaudeUsageTracker/UpdateKeys.json"
+          $keys = (Get-Content $keysJson -Raw | ConvertFrom-Json).keys
+          if (-not $keys -or $keys.Count -eq 0) {
+            Write-Host "::notice::No update-signing public key configured yet — in-app updates are inactive, skipping."
+            exit 0
+          }
+
+          # release event → that tag; schedule/dispatch → latest published release.
+          $tag = "${{ github.event.release.tag_name }}"
+          if (-not $tag) { $tag = gh release view --json tagName --jq '.tagName' }
+          if (-not $tag) { throw "could not determine a released tag" }
+          $version = $tag -replace '^v', ''
+          Write-Host "Verifying release $tag"
+
+          $work = Join-Path $env:RUNNER_TEMP ("verify-" + [Guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Force $work | Out-Null
+          gh release download $tag --dir $work `
+            --pattern "update.json" --pattern "update.json.sig" `
+            --pattern "ClaudeUsageTracker-Setup-*.exe"
+          if ($LASTEXITCODE -ne 0) {
+            throw "release $tag is missing update.json / update.json.sig / the Setup asset — an unsigned release must not be published"
+          }
+
+          $setup = "ClaudeUsageTracker-Setup-$version.exe"
+          dotnet run --project csharp/UpdateTool -c Release -- verify `
+            --keys $keysJson `
+            --manifest (Join-Path $work "update.json") `
+            --sig (Join-Path $work "update.json.sig") `
+            --current "0.0.0" `
+            --asset "$setup=$(Join-Path $work $setup)"
+          if ($LASTEXITCODE -ne 0) { throw "signature/digest verification FAILED for $tag" }
+          Write-Host "Release $tag verified: signature and installer digest are valid."

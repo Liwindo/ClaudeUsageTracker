@@ -6,6 +6,7 @@ STRINGS: dict[str, str] = {
     "tray.error": "Fehler: {message}",
     "tray.menu.show_hide": "Widget ein-/ausblenden",
     "tray.menu.refresh": "Jetzt aktualisieren",
+    "tray.menu.check_updates": "Nach Updates suchen",
     "tray.menu.view_log": "Logdatei anzeigen",
     "tray.menu.open_appdata": "App-Datenordner öffnen",
     "tray.menu.quit": "Beenden",
@@ -60,6 +61,8 @@ STRINGS: dict[str, str] = {
     "update.cancel": "Abbrechen",
     "update.skip": "Version überspringen",
     "update.open_github": "GitHub öffnen",
+    "update.up_to_date": "Sie verwenden die neueste Version ({version}).",
+    "update.check_failed": "Suche nach Updates fehlgeschlagen. Bitte später erneut versuchen.",
 
     # Startup dialogs
     "dialog.already_running.title": "Claude Usage Tracker",

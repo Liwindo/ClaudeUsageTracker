@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "Een taalwijziging wordt van kracht na de volgende herstart.",
   "settings.invalid_thresholds": "Voer hele percentages tussen 0 en 100 in, gescheiden door komma's.",
   "settings.invalid_interval": "Het polling-interval moet minimaal 10 seconden zijn.",
-  "toast.open_claude": "claude.ai openen"
+  "toast.open_claude": "claude.ai openen",
+  "update.download_install": "Downloaden en installeren",
+  "update.downloading": "Downloaden…",
+  "update.verifying": "Handtekening verifiëren…",
+  "update.installing": "Installeren…",
+  "update.failed": "Update kon niet worden geverifieerd. Probeer opnieuw of download via GitHub.",
+  "settings.check_updates": "Nu op updates controleren",
+  "update.up_to_date": "Je gebruikt de nieuwste versie ({version}).",
+  "update.check_failed": "Kan niet op updates controleren. Probeer het later opnieuw.",
+  "tray.menu.check_updates": "Op updates controleren"
 }

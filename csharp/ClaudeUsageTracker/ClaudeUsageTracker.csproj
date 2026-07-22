@@ -29,6 +29,15 @@
     <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
+  <!-- In-app download-and-install is only safe for the INSTALLED build (it hands
+       off to the per-user Inno installer, which replaces files in place). The
+       portable single-EXE and dev builds leave the feature off and keep the
+       "open GitHub" path. build-release.ps1 sets InstallerUpdater=true only for
+       the installer payload publish. -->
+  <PropertyGroup Condition="'$(InstallerUpdater)' == 'true'">
+    <DefineConstants>$(DefineConstants);INSTALLER_UPDATER</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- 0–9; higher = GC keeps less memory reserved. The tracker idles 99 % of
          the time, so a lean heap matters more than allocation throughput. -->
@@ -44,6 +53,10 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Locales\*.json" />
+    <!-- Update-signing public key(s): the trust anchor for in-app updates.
+         Embedded so the shipped binary carries it; the same file is the single
+         source read by the offline signing tool and the CI integrity guard. -->
+    <EmbeddedResource Include="UpdateKeys.json" />
     <Resource Include="Assets\logo.png" />
   </ItemGroup>
 

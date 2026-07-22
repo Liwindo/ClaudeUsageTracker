@@ -178,8 +178,8 @@ public sealed class WidgetWindow : Window
         SavePosition();
     });
 
-    public void NotifyUpdate(string latestVersion, string url, Action? onSkip) =>
-        Post(() => ShowUpdateDialog(latestVersion, url, onSkip));
+    public void NotifyUpdate(UpdateInfo info, Action? onSkip) =>
+        Post(() => ShowUpdateDialog(info, onSkip));
 
     public void Shutdown() => Post(() =>
     {
@@ -908,10 +908,12 @@ public sealed class WidgetWindow : Window
 
     // ── Update dialog ────────────────────────────────────────────────────────
 
-    private void ShowUpdateDialog(string latestVersion, string url, Action? onSkip)
+    private void ShowUpdateDialog(UpdateInfo info, Action? onSkip)
     {
         if (_updateWindow is not null)
             return;
+        var latestVersion = info.LatestVersion;
+        var url = info.Url;
 
         var card = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
 
@@ -988,6 +990,19 @@ public sealed class WidgetWindow : Window
 
         void CloseDialog() => win.Close();
 
+        // Progress/error line for the in-app installer; hidden until used.
+        var statusText = new TextBlock
+        {
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Solid(Dim),
+            Margin = new Thickness(0, 0, 0, 10),
+            Visibility = Visibility.Collapsed,
+            MaxWidth = 300,
+        };
+        card.Children.Add(statusText);
+
         var buttonRow = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -1001,8 +1016,7 @@ public sealed class WidgetWindow : Window
             button.Margin = new Thickness(8, 0, 0, 0);
             return button;
         }
-        // Windows button order: [primary] [secondary] [cancel].
-        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.open_github"), () =>
+        void OpenGithub()
         {
             try
             {
@@ -1013,8 +1027,51 @@ public sealed class WidgetWindow : Window
             {
                 Log.Warning("widget", $"Could not open release page: {exc.Message}");
             }
-            CloseDialog();
-        }));
+        }
+
+        // Windows button order: [primary] [secondary] [cancel].
+#if INSTALLER_UPDATER
+        // Installed build: offer verified download-and-install. The bytes are
+        // signature- and hash-checked (UpdateInstaller) before anything runs;
+        // on success the app quits so the installer can replace it in place and
+        // the new version relaunches.
+        Button? installButton = null;
+        void StartInstall()
+        {
+            installButton!.IsEnabled = false;
+            statusText.Visibility = Visibility.Visible;
+            statusText.Text = I18n.Tr("update.downloading");
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var outcome = UpdateInstaller.Run(info, UpdateCheck.CurrentVersion, stage =>
+                    Post(() => statusText.Text = stage switch
+                    {
+                        UpdateStage.Downloading => I18n.Tr("update.downloading"),
+                        UpdateStage.Verifying => I18n.Tr("update.verifying"),
+                        UpdateStage.Installing => I18n.Tr("update.installing"),
+                        _ => statusText.Text,
+                    }));
+                Post(() =>
+                {
+                    if (outcome.Started)
+                    {
+                        statusText.Text = I18n.Tr("update.installing");
+                        _onQuit(); // exit so the installer can replace files; it relaunches us
+                    }
+                    else
+                    {
+                        statusText.Foreground = Solid(Alert);
+                        statusText.Text = I18n.Tr("update.failed");
+                    }
+                });
+            });
+        }
+        installButton = MakeDialogButton(I18n.Tr("update.download_install"), StartInstall);
+        buttonRow.Children.Add(installButton);
+        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.open_github"), () => { OpenGithub(); CloseDialog(); }));
+#else
+        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.open_github"), () => { OpenGithub(); CloseDialog(); }));
+#endif
         if (onSkip is not null)
         {
             buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.skip"), () =>

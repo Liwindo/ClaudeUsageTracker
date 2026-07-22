@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "Ein Sprachwechsel wirkt sich erst nach dem nächsten Neustart aus.",
   "settings.invalid_thresholds": "Bitte ganze Prozentwerte zwischen 0 und 100 eingeben, durch Kommas getrennt.",
   "settings.invalid_interval": "Das Abrufintervall muss mindestens 10 Sekunden betragen.",
-  "toast.open_claude": "claude.ai öffnen"
+  "toast.open_claude": "claude.ai öffnen",
+  "update.download_install": "Herunterladen & installieren",
+  "update.downloading": "Wird heruntergeladen…",
+  "update.verifying": "Signatur wird geprüft…",
+  "update.installing": "Wird installiert…",
+  "update.failed": "Update konnte nicht verifiziert werden. Bitte erneut versuchen oder von GitHub laden.",
+  "settings.check_updates": "Jetzt nach Updates suchen",
+  "update.up_to_date": "Sie verwenden die neueste Version ({version}).",
+  "update.check_failed": "Suche nach Updates fehlgeschlagen. Bitte später erneut versuchen.",
+  "tray.menu.check_updates": "Nach Updates suchen"
 }

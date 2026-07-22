@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "Zmiana języka zacznie obowiązywać po następnym uruchomieniu.",
   "settings.invalid_thresholds": "Podaj całkowite wartości procentowe od 0 do 100, oddzielone przecinkami.",
   "settings.invalid_interval": "Częstotliwość odpytywania musi wynosić co najmniej 10 sekund.",
-  "toast.open_claude": "Otwórz claude.ai"
+  "toast.open_claude": "Otwórz claude.ai",
+  "update.download_install": "Pobierz i zainstaluj",
+  "update.downloading": "Pobieranie…",
+  "update.verifying": "Weryfikacja podpisu…",
+  "update.installing": "Instalowanie…",
+  "update.failed": "Nie udało się zweryfikować aktualizacji. Spróbuj ponownie lub pobierz z GitHub.",
+  "settings.check_updates": "Sprawdź aktualizacje teraz",
+  "update.up_to_date": "Używasz najnowszej wersji ({version}).",
+  "update.check_failed": "Nie udało się sprawdzić aktualizacji. Spróbuj ponownie później.",
+  "tray.menu.check_updates": "Sprawdź aktualizacje"
 }

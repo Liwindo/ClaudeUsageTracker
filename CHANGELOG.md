@@ -9,6 +9,11 @@ must satisfy — the invariants a fix establishes — lives in
 
 ## Unreleased
 
+### ✨ New features
+
+- **Check for updates on demand.** Both variants now have a **Check for updates** entry in the tray menu (and the C# settings dialog has a button), so you no longer have to restart to look for a new version. It clearly tells you whether an update is available, you are up to date, or the check couldn't reach GitHub — and it surfaces a release even if you previously chose "Skip version".
+- **C# installer: one-click, cryptographically verified updates.** The installed C# build can now download and install a newer release for you (**Download & install** in the update dialog) instead of only opening the GitHub page. Security was the priority: the app installs an update **only** if a signature made with an offline key — one that never exists on GitHub or in CI — verifies against a public key built into the app, the download's SHA-256 matches that signed manifest, and the version is strictly newer. Anything else is refused and nothing is run. The portable EXE and the Python variant keep opening the GitHub page (a single-file EXE can't safely replace itself).
+
 ### 🐛 Bug fixes
 
 - **C# variant: the widget no longer jumps when Anthropic's peak-hour banner appears or disappears.** Its bottom edge is now anchored, so the extra banner height grows the window upward and the resting position stays put across every peak/non-peak transition — matching the Python variant (which fixed the same issue in 1.4.1). The saved position is stored as a height-invariant bottom anchor, so restarting during peak hours can no longer drift the widget.

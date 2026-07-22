@@ -37,3 +37,9 @@ obj/
 publish/
 *.user
 .vs/
+
+# Update-signing PRIVATE keys — MUST never be committed. The signing key is
+# offline-only; only its public half lives in the repo (UpdateKeys.json).
+*.pem
+*.key
+update-signing-key*

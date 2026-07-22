@@ -71,5 +71,14 @@
   "settings.language_restart_hint": "Le changement de langue prendra effet au prochain redémarrage.",
   "settings.invalid_thresholds": "Saisissez des pourcentages entiers entre 0 et 100, séparés par des virgules.",
   "settings.invalid_interval": "L'intervalle d'interrogation doit être d'au moins 10 secondes.",
-  "toast.open_claude": "Ouvrir claude.ai"
+  "toast.open_claude": "Ouvrir claude.ai",
+  "update.download_install": "Télécharger et installer",
+  "update.downloading": "Téléchargement…",
+  "update.verifying": "Vérification de la signature…",
+  "update.installing": "Installation…",
+  "update.failed": "Impossible de vérifier la mise à jour. Réessayez ou téléchargez-la depuis GitHub.",
+  "settings.check_updates": "Rechercher des mises à jour maintenant",
+  "update.up_to_date": "Vous utilisez la dernière version ({version}).",
+  "update.check_failed": "Impossible de rechercher des mises à jour. Réessayez plus tard.",
+  "tray.menu.check_updates": "Rechercher des mises à jour"
 }

@@ -32,6 +32,7 @@ public sealed class AppOrchestrator
             onClickOpen: _widget.Toggle,
             onClickRefresh: OnRefreshRequested,
             onSettings: ShowSettings,
+            onCheckUpdates: CheckForUpdatesNow,
             onQuit: Quit);
         _notifier = new NotificationManager(config.NotificationThresholds, _tray.ShowToast);
         _poller = new Poller(config, OnData, OnError);
@@ -52,7 +53,7 @@ public sealed class AppOrchestrator
                 Thread.Sleep(3000);
                 var info = UpdateCheck.CheckForUpdate(_config.SkipUpdateVersion);
                 if (info is not null)
-                    _widget.NotifyUpdate(info.LatestVersion, info.Url, () => SkipUpdate(info.LatestVersion));
+                    _widget.NotifyUpdate(info, () => SkipUpdate(info.LatestVersion));
             });
         }
         if (!_widget.StartMinimized)
@@ -94,10 +95,41 @@ public sealed class AppOrchestrator
             _settingsWindow.Activate();
             return;
         }
-        _settingsWindow = new SettingsWindow(_config, OnSettingsApplied);
+        _settingsWindow = new SettingsWindow(_config, OnSettingsApplied, CheckForUpdatesNow);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
+    });
+
+    /// <summary>Manual "check for updates now" from the settings dialog. Runs off
+    /// the UI thread and reports all three outcomes distinctly — a newer release
+    /// opens the update dialog, otherwise a short message says up-to-date or that
+    /// the check failed (so a network error never masquerades as "up to date").
+    /// Ignores the skip-version preference: a manual check always surfaces.</summary>
+    private void CheckForUpdatesNow() => Task.Run(() =>
+    {
+        var result = UpdateCheck.CheckDetailed("");
+        _widget.Post(() =>
+        {
+            switch (result.Status)
+            {
+                case UpdateCheckStatus.Available:
+                    _widget.NotifyUpdate(result.Info!, () => SkipUpdate(result.Info!.LatestVersion));
+                    break;
+                case UpdateCheckStatus.UpToDate:
+                    System.Windows.MessageBox.Show(
+                        I18n.Tr("update.up_to_date", ("version", UpdateCheck.CurrentVersion)),
+                        I18n.Tr("update.window_title"),
+                        System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    break;
+                default:
+                    System.Windows.MessageBox.Show(
+                        I18n.Tr("update.check_failed"),
+                        I18n.Tr("update.window_title"),
+                        System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                    break;
+            }
+        });
     });
 
     private void OnSettingsApplied(Config config)

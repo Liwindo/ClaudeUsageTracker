@@ -81,3 +81,48 @@ def test_non_200_returns_none():
 def test_network_error_returns_none():
     with mock.patch.object(uc.httpx, "get", side_effect=OSError("offline")):
         assert uc.check_for_update() is None
+
+
+# ── Detailed result: the manual "check now" path must tell up-to-date apart
+#    from a failed check, so a network error never reads as "you are current". ──
+
+
+def test_evaluate_available_for_newer_tag():
+    result = uc.evaluate_release(
+        {"tag_name": "v99.0.0", "html_url": "https://x/v99"}, current_version="1.0.0"
+    )
+    assert result.status == uc.STATUS_AVAILABLE
+    assert result.info is not None and result.info.latest_version == "99.0.0"
+
+
+def test_evaluate_up_to_date_for_equal_or_older():
+    assert uc.evaluate_release({"tag_name": "v1.0.0"}, current_version="1.0.0").status == uc.STATUS_UP_TO_DATE
+    assert uc.evaluate_release({"tag_name": "v0.9.0"}, current_version="1.0.0").status == uc.STATUS_UP_TO_DATE
+
+
+def test_evaluate_skipped_is_up_to_date_but_manual_still_surfaces():
+    payload = {"tag_name": "v99.0.0"}
+    assert uc.evaluate_release(payload, skip_version="99.0.0", current_version="1.0.0").status == uc.STATUS_UP_TO_DATE
+    assert uc.evaluate_release(payload, skip_version="", current_version="1.0.0").status == uc.STATUS_AVAILABLE
+
+
+def test_evaluate_non_dict_is_failed_not_up_to_date():
+    # The crucial distinction: a malformed body must be FAILED, never a false
+    # "up to date" that would hide a real (but unreadable) newer release.
+    assert uc.evaluate_release(["unexpected"], current_version="1.0.0").status == uc.STATUS_FAILED
+    assert uc.evaluate_release(None, current_version="1.0.0").status == uc.STATUS_FAILED
+
+
+def test_check_detailed_non_200_is_failed():
+    with _with_response(500, {}):
+        assert uc.check_detailed().status == uc.STATUS_FAILED
+
+
+def test_check_detailed_network_error_is_failed():
+    with mock.patch.object(uc.httpx, "get", side_effect=OSError("offline")):
+        assert uc.check_detailed().status == uc.STATUS_FAILED
+
+
+def test_check_detailed_up_to_date():
+    with _with_response(200, {"tag_name": f"v{uc.__version__}"}):
+        assert uc.check_detailed().status == uc.STATUS_UP_TO_DATE
