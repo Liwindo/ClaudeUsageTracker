@@ -7,6 +7,13 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### 🔒 Security / hardening
+
+- **Update anti-rollback is now durable across restarts (C# installer).** The updater already refused any release that wasn't strictly newer than the running version; it now also remembers the highest version this install has ever run (`update_version_floor`) and refuses anything at or below it. This closes a narrow downgrade path: even a validly-signed *older* release (e.g. served by a compromised GitHub account) can no longer be installed over a build that once ran something newer.
+- **Release-integrity workflow no longer inlines the release tag into its script.** The published tag is now passed to the verification step as an environment value instead of being expanded into the PowerShell body, removing an expression-injection foothold (only exploitable by someone who could already publish releases, but eliminated regardless).
+
 ## 2.2.0 — 2026-07-22
 
 ### ✨ New features

@@ -178,8 +178,8 @@ public sealed class WidgetWindow : Window
         SavePosition();
     });
 
-    public void NotifyUpdate(UpdateInfo info, Action? onSkip) =>
-        Post(() => ShowUpdateDialog(info, onSkip));
+    public void NotifyUpdate(UpdateInfo info, string versionFloor, Action? onSkip) =>
+        Post(() => ShowUpdateDialog(info, versionFloor, onSkip));
 
     public void Shutdown() => Post(() =>
     {
@@ -908,7 +908,7 @@ public sealed class WidgetWindow : Window
 
     // ── Update dialog ────────────────────────────────────────────────────────
 
-    private void ShowUpdateDialog(UpdateInfo info, Action? onSkip)
+    private void ShowUpdateDialog(UpdateInfo info, string versionFloor, Action? onSkip)
     {
         if (_updateWindow is not null)
             return;
@@ -1043,7 +1043,7 @@ public sealed class WidgetWindow : Window
             statusText.Text = I18n.Tr("update.downloading");
             System.Threading.Tasks.Task.Run(() =>
             {
-                var outcome = UpdateInstaller.Run(info, UpdateCheck.CurrentVersion, stage =>
+                var outcome = UpdateInstaller.Run(info, versionFloor, stage =>
                     Post(() => statusText.Text = stage switch
                     {
                         UpdateStage.Downloading => I18n.Tr("update.downloading"),

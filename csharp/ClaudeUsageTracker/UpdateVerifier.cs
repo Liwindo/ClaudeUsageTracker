@@ -142,6 +142,19 @@ public static class UpdateVerifier
         return UpdateVerification.Pass(asset);
     }
 
+    /// <summary>The greater of two versions, used to pick the anti-rollback floor
+    /// = max(running version, persisted highest-seen). A blank/unparseable side
+    /// yields the other; if both are unusable, <paramref name="a"/> is returned
+    /// verbatim. Never throws.</summary>
+    public static string HigherVersion(string a, string b)
+    {
+        if (string.IsNullOrWhiteSpace(b))
+            return a;
+        if (string.IsNullOrWhiteSpace(a))
+            return b;
+        return IsStrictlyNewer(b, a) ? b : a;
+    }
+
     /// <summary>Dotted numeric compare with zero-padding: "2.2" &gt; "2.1.9",
     /// "2.1" == "2.1.0". Unparseable input on either side → false (fail closed).
     /// Components beyond int range read as unparseable, never throw.</summary>

@@ -45,6 +45,7 @@ public class ConfigTests : IDisposable
         cfg.NotificationThresholds = [50, 75, 90];
         cfg.Language = "de";
         cfg.SkipUpdateVersion = "9.9.9";
+        cfg.UpdateVersionFloor = "2.2.0";
         cfg.Save();
 
         var reloaded = Config.Load(path);
@@ -52,6 +53,7 @@ public class ConfigTests : IDisposable
         Assert.Equal([50, 75, 90], reloaded.NotificationThresholds);
         Assert.Equal("de", reloaded.Language);
         Assert.Equal("9.9.9", reloaded.SkipUpdateVersion);
+        Assert.Equal("2.2.0", reloaded.UpdateVersionFloor);
     }
 
     [Fact]

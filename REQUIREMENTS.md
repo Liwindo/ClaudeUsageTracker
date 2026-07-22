@@ -261,8 +261,15 @@ app install an attacker's build.**
   size recorded in the **signed** manifest (constant-time compare) before it is
   executed. *Verified by: `UpdateVerifierTests.DownloadedBytesMustMatchSignedDigest`.*
 - **R-update-4** — **Anti-rollback:** the manifest version MUST be strictly newer
-  than the running version; an equal or older version MUST be refused even if
-  validly signed. *Verified by: `UpdateVerifierTests.EqualOrOlderVersionIsRejected`.*
+  than the anti-rollback floor; an equal or older version MUST be refused even if
+  validly signed. The floor MUST be the greater of the running version and a
+  **persisted highest-seen version** (`update_version_floor` in config), raised on
+  every start and never lowered — so a later, legitimately-signed but *older*
+  release cannot be pushed onto an install that has already run a newer version.
+  *Verified by: `UpdateVerifierTests.EqualOrOlderVersionIsRejected`,
+  `UpdateVerifierTests.SignedButOlderThanFloorIsRejected`,
+  `UpdateVerifierTests.HigherVersionPicksTheGreater`; floor persistence in
+  `AppOrchestrator.RaiseVersionFloor` + `ConfigTests`.*
 - **R-update-5** — Assets MUST be downloaded only over HTTPS from
   `github.com` / `*.githubusercontent.com`; every redirect hop MUST be
   re-validated against that allow-list, downloads MUST be size-capped and

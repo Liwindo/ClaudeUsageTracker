@@ -41,6 +41,7 @@ public sealed class AppOrchestrator
     /// <summary>Start everything. Blocks until the user quits.</summary>
     public void Run()
     {
+        RaiseVersionFloor();
         _poller.Start();
         _tray.Show();
         if (_config.UpdateCheck)
@@ -53,7 +54,7 @@ public sealed class AppOrchestrator
                 Thread.Sleep(3000);
                 var info = UpdateCheck.CheckForUpdate(_config.SkipUpdateVersion);
                 if (info is not null)
-                    _widget.NotifyUpdate(info, () => SkipUpdate(info.LatestVersion));
+                    _widget.NotifyUpdate(info, EffectiveVersionFloor(), () => SkipUpdate(info.LatestVersion));
             });
         }
         if (!_widget.StartMinimized)
@@ -114,7 +115,7 @@ public sealed class AppOrchestrator
             switch (result.Status)
             {
                 case UpdateCheckStatus.Available:
-                    _widget.NotifyUpdate(result.Info!, () => SkipUpdate(result.Info!.LatestVersion));
+                    _widget.NotifyUpdate(result.Info!, EffectiveVersionFloor(), () => SkipUpdate(result.Info!.LatestVersion));
                     break;
                 case UpdateCheckStatus.UpToDate:
                     System.Windows.MessageBox.Show(
@@ -141,6 +142,32 @@ public sealed class AppOrchestrator
         Autostart.Sync(config.Autostart);
         Log.Info("app", "Settings applied.");
         _poller.RefreshNow(); // reflect the new interval / thresholds promptly
+    }
+
+    /// <summary>The anti-rollback floor to gate an install against: whichever is
+    /// greater, the running version or the persisted highest-seen version.</summary>
+    private string EffectiveVersionFloor() =>
+        UpdateVerifier.HigherVersion(UpdateCheck.CurrentVersion, _config.UpdateVersionFloor);
+
+    /// <summary>Record the highest version this install has ever run, so a later
+    /// (legitimately signed but older) release can never be pushed onto us. The
+    /// floor only ever rises; a downgrade/manual roll-back keeps the old floor.
+    /// Best-effort persistence — a read-only config must not prevent startup.</summary>
+    private void RaiseVersionFloor()
+    {
+        var floor = EffectiveVersionFloor();
+        if (floor == _config.UpdateVersionFloor)
+            return;
+        _config.UpdateVersionFloor = floor;
+        try
+        {
+            _config.Save();
+            Log.Info("app", $"Update version floor raised to {floor}.");
+        }
+        catch (Exception exc)
+        {
+            Log.Warning("app", $"Could not persist version floor: {exc.Message}");
+        }
     }
 
     private void SkipUpdate(string version)

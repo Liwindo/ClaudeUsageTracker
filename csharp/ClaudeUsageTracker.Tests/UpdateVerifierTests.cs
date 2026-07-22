@@ -119,6 +119,39 @@ public class UpdateVerifierTests
         Assert.Contains("anti-rollback", result.Error);
     }
 
+    // R-update-4 (floor): HigherVersion picks the greater of running vs. persisted
+    // highest-seen, tolerating blank/unparseable input, so the floor only rises.
+    [Theory]
+    [InlineData("2.2.0", "", "2.2.0")]        // no persisted floor yet → running
+    [InlineData("2.0.0", "2.2.0", "2.2.0")]   // persisted floor higher → floor wins
+    [InlineData("2.3.0", "2.2.0", "2.3.0")]   // running higher → running wins
+    [InlineData("2.2.0", "2.2.0", "2.2.0")]   // equal → same value
+    [InlineData("2.2.0", "garbage", "2.2.0")] // unparseable floor → running
+    [InlineData("", "2.2.0", "2.2.0")]        // blank running → floor
+    public void HigherVersionPicksTheGreater(string running, string floor, string expected)
+    {
+        Assert.Equal(expected, UpdateVerifier.HigherVersion(running, floor));
+    }
+
+    // R-update-4 (floor): the concrete attack the persisted floor closes — a
+    // GENUINELY signed but OLDER release (newer than the running build, so it
+    // would otherwise install) is refused once the app has ever run something
+    // higher. The floor is passed to Verify as the effective current version.
+    [Fact]
+    public void SignedButOlderThanFloorIsRejected()
+    {
+        using var key = NewKey();
+        // Attacker replays a real, signed 2.1.0 while we run 2.0.0 but have a
+        // persisted floor of 2.2.0 (we ran 2.2.0 before). max(2.0.0, 2.2.0)=2.2.0.
+        var floor = UpdateVerifier.HigherVersion("2.0.0", "2.2.0");
+        var bytes = Manifest("2.1.0", Asset, new string('a', 64), 100);
+
+        var result = UpdateVerifier.Verify(bytes, Sign(key, bytes), Asset, floor, [Spki(key)]);
+
+        Assert.False(result.Ok);
+        Assert.Contains("anti-rollback", result.Error);
+    }
+
     // R-update-5: only https github.com / *.githubusercontent.com may serve an asset.
     [Theory]
     [InlineData("https://github.com/Liwindo/ClaudeUsageTracker/releases/download/v9.9.9/x.exe", true)]

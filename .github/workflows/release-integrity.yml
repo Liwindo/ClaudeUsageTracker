@@ -37,6 +37,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          # Passed as a runtime value, never expanded into the script body — an
+          # attacker-chosen tag can never be parsed as PowerShell (expression
+          # injection). It stays plain data.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           $keysJson = "csharp/ClaudeUsageTracker/UpdateKeys.json"
           $keys = (Get-Content $keysJson -Raw | ConvertFrom-Json).keys
@@ -46,7 +50,7 @@ jobs:
           }
 
           # release event → that tag; schedule/dispatch → latest published release.
-          $tag = "${{ github.event.release.tag_name }}"
+          $tag = $env:RELEASE_TAG
           if (-not $tag) { $tag = gh release view --json tagName --jq '.tagName' }
           if (-not $tag) { throw "could not determine a released tag" }
           $version = $tag -replace '^v', ''
