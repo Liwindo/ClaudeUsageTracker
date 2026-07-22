@@ -42,6 +42,9 @@ public sealed class AppOrchestrator
     public void Run()
     {
         RaiseVersionFloor();
+        // Remove any installer staged by a previous update: after an update the
+        // freshly-installed version relaunches and this start sweeps it away.
+        UpdateInstaller.CleanUpStagedInstallers();
         _poller.Start();
         _tray.Show();
         if (_config.UpdateCheck)

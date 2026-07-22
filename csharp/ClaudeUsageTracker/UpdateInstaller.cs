@@ -3,15 +3,28 @@
 // This is the I/O around the pure trust gate (UpdateVerifier). It downloads the
 // signed manifest, its detached signature and the Setup installer from the
 // GitHub release, refuses anything that does not verify against the embedded
-// offline public key, and only then launches the (per-user, silent) installer.
+// offline public key, and only then launches the installer.
 //
 // It is deliberately conservative about the network: every hop must stay on an
 // allow-listed HTTPS GitHub host (no open redirects to an attacker's server),
 // every download is size-capped and time-limited, and the installer bytes are
-// re-hashed against the SIGNED manifest before a single byte is executed. The
-// downloaded installer lands in a fresh per-user temp directory (not a shared
-// location) and is executed by path immediately after verification, closing the
-// time-of-check/time-of-use gap.
+// re-hashed against the SIGNED manifest before a single byte is executed.
+//
+// HOW IT INSTALLS — and why it looks completely ordinary to security software.
+// Antivirus behaviour engines (e.g. Bitdefender ATC) score a process on what it
+// DOES, and the classic dropper fingerprint is: a program spawns a hidden script
+// interpreter that SILENTLY runs a freshly-downloaded EXE out of %TEMP%. We do
+// none of that — a false positive there would damage the project's reputation
+// far more than it would help. Instead the updater:
+//   * stages the verified installer under %LOCALAPPDATA% (this app's own folder),
+//     never %TEMP%;
+//   * launches it exactly the way a person double-clicking it would — a normal,
+//     VISIBLE Inno Setup wizard via ShellExecute, with NO command-line switches,
+//     NO silent/unattended flags, and NO intermediate powershell/cmd;
+//   * lets the installer itself relaunch the app on its Finish page ([Run]
+//     postinstall), so there is no second process-spawn to explain either.
+// The app then quits so the running EXE is unlocked for replacement. See
+// REQUIREMENTS.md R-update-9.
 //
 // Feature-gated: only the installer build (INSTALLER_UPDATER) ever calls Run —
 // the portable single-EXE cannot safely replace itself, so it keeps the
@@ -85,17 +98,19 @@ public static class UpdateInstaller
                 return UpdateOutcome.Fail("downloaded installer failed the signed integrity check");
             }
 
-            // Land in a fresh, per-user directory (never a shared temp) and run
-            // that exact file — no window for another writer to swap it.
-            var dir = Path.Combine(Path.GetTempPath(),
-                "claude-usage-tracker-cs-update-" + Guid.NewGuid().ToString("N"));
+            // Stage under %LOCALAPPDATA% (never %TEMP%), in a fresh per-user
+            // subdirectory, and run THAT exact file — no window for another
+            // writer to swap it (TOCTOU-safe). Sweep any leftovers from a prior
+            // update first so installers never pile up.
+            CleanUpStagedInstallers();
+            var dir = Path.Combine(AppPaths.UpdatesDir, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             var setupPath = Path.Combine(dir, setupName);
             File.WriteAllBytes(setupPath, setupBytes);
 
             onStage(UpdateStage.Installing);
-            LaunchInstallerAndRelaunch(setupPath);
-            Log.Info("update", $"Verified installer {info.LatestVersion} launched; quitting for replacement.");
+            LaunchInstaller(setupPath);
+            Log.Info("update", $"Verified installer {info.LatestVersion} launched (visible); quitting for replacement.");
             return UpdateOutcome.Ok();
         }
         catch (Exception exc)
@@ -167,33 +182,37 @@ public static class UpdateInstaller
         return buffer.ToArray();
     }
 
-    /// <summary>Start a detached waiter that runs the verified installer silently
-    /// once THIS process has exited (so the in-use EXE is unlocked), then relaunch
-    /// the freshly installed app. The installer is per-user, so it never elevates.
-    /// </summary>
-    private static void LaunchInstallerAndRelaunch(string setupPath)
+    /// <summary>Launch the verified installer the way a person double-clicking it
+    /// would: a normal, VISIBLE Inno Setup wizard via ShellExecute, with NO
+    /// command-line switches (no silent/unattended flags) and NO intermediate
+    /// shell. The installer is per-user, so it never elevates; it closes the
+    /// running app via its Restart Manager and relaunches it from its Finish page
+    /// ([Run] postinstall). Nothing here resembles a dropper — see the file
+    /// header and REQUIREMENTS.md R-update-9. The caller quits the app afterwards
+    /// so the in-use EXE is unlocked for replacement.</summary>
+    private static void LaunchInstaller(string setupPath)
     {
-        var exePath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("cannot determine own executable path");
-        var pid = Environment.ProcessId;
-
-        // PowerShell one-liner: wait for our PID to exit, run the installer
-        // silently, then start the new build. Single-quoted args are PS-escaped.
-        var command =
-            $"Wait-Process -Id {pid} -ErrorAction SilentlyContinue; " +
-            $"Start-Process -FilePath '{PsQuote(setupPath)}' " +
-            "-ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait; " +
-            $"Start-Process -FilePath '{PsQuote(exePath)}'";
-
-        var psi = new ProcessStartInfo("powershell.exe",
-            $"-NoProfile -NonInteractive -WindowStyle Hidden -Command \"{command}\"")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-        };
-        Process.Start(psi);
+        // UseShellExecute = true → ShellExecute, i.e. the exact "open this file"
+        // action Explorer performs on a double-click. No hidden window, no args.
+        Process.Start(new ProcessStartInfo(setupPath) { UseShellExecute = true });
     }
 
-    private static string PsQuote(string path) => path.Replace("'", "''");
+    /// <summary>Best-effort removal of installers staged by earlier updates, so
+    /// %LOCALAPPDATA%\...\updates never accumulates. Called at app startup (so the
+    /// installer used for THIS update is gone once the freshly-installed version
+    /// relaunches) and again before staging a new download. A file still locked by
+    /// an in-flight installer is simply skipped and cleaned up on the next start.
+    /// </summary>
+    public static void CleanUpStagedInstallers()
+    {
+        try
+        {
+            if (Directory.Exists(AppPaths.UpdatesDir))
+                Directory.Delete(AppPaths.UpdatesDir, recursive: true);
+        }
+        catch (Exception exc)
+        {
+            Log.Info("update", $"Could not remove staged update installer(s): {exc.Message}");
+        }
+    }
 }

@@ -1056,7 +1056,10 @@ public sealed class WidgetWindow : Window
                     if (outcome.Started)
                     {
                         statusText.Text = I18n.Tr("update.installing");
-                        _onQuit(); // exit so the installer can replace files; it relaunches us
+                        // The visible installer wizard is now on screen; quit so
+                        // the in-use EXE unlocks. The installer relaunches the new
+                        // version from its Finish page ([Run] postinstall).
+                        _onQuit();
                     }
                     else
                     {

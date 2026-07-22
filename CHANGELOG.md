@@ -7,6 +7,12 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy â€” the invariants a fix establishes â€” lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### 🔧 Changed
+
+- **C# in-app update now runs the normal, visible installer** instead of a silent background install. When you choose "Download & install", the verified installer opens as an ordinary setup wizard (the same one you'd get by downloading it yourself) and relaunches the app when it finishes. This removes an install technique — a hidden helper silently running a freshly-downloaded file out of the temp folder — that some antivirus tools (e.g. Bitdefender) flagged as suspicious behaviour, even though the download is cryptographically verified before anything runs. The signature/hash/anti-rollback checks are unchanged; only the final launch is now indistinguishable from a normal install. The staged installer is kept under the app's own `%LOCALAPPDATA%` folder rather than `%TEMP%`, and is deleted automatically once the updated app relaunches.
+
 ## 2.2.1 — 2026-07-22
 
 ### ðŸ”’ Security / hardening

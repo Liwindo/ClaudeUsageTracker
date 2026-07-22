@@ -274,9 +274,13 @@ app install an attacker's build.**
   `github.com` / `*.githubusercontent.com`; every redirect hop MUST be
   re-validated against that allow-list, downloads MUST be size-capped and
   time-limited, and the verified installer MUST land in a fresh per-user
-  directory and be executed by that exact path (no TOCTOU window). *Verified by:
-  `UpdateVerifierTests.OnlyGithubHttpsAssetUrlsAreAllowed`; download hardening in
-  `UpdateInstaller`.*
+  directory **under `%LOCALAPPDATA%` (never `%TEMP%`)** and be executed by that
+  exact path (no TOCTOU window). The staged installer MUST be cleaned up
+  automatically (on the next app start — i.e. once the updated version relaunches
+  — and before staging a new one) so downloaded installers never accumulate.
+  *Verified by: `UpdateVerifierTests.OnlyGithubHttpsAssetUrlsAreAllowed`; download
+  hardening + `AppPaths.UpdatesDir` staging + `UpdateInstaller.CleanUpStagedInstallers`
+  (called from `AppOrchestrator.Run`).*
 - **R-update-6** — **Fail closed.** Any failure (no embedded key, bad signature,
   hash mismatch, disallowed host, missing asset, network error) MUST abort the
   install and leave the running app untouched; with no embedded key the feature
@@ -297,3 +301,18 @@ app install an attacker's build.**
 - **R-update-8** — Multiple embedded public keys MUST be supported so a key can be
   rotated (ship a build trusting old+new before signing with the new key).
   *Verified by: `UpdateVerifierTests.SignatureVerifiesUnderAnyEmbeddedKey`.*
+- **R-update-9** — **No malware-shaped install technique.** The install step MUST
+  NOT do anything a security product's behaviour engine scores as dropper-like — a
+  false positive would damage the project's reputation more than the feature helps.
+  Concretely it MUST NOT: spawn a hidden/`-WindowStyle Hidden` script interpreter
+  (powershell/cmd) to carry out the install; run the downloaded installer with
+  silent/unattended switches (`/VERYSILENT`, `/SILENT`, `/SUPPRESSMSGBOXES`, …);
+  or execute a freshly-downloaded binary out of `%TEMP%`. It MUST launch the
+  installer as an ordinary, **visible** ShellExecute of the staged file with **no
+  arguments** (a normal Inno Setup wizard), letting the installer close/relaunch
+  the app itself, then the app quits so its EXE unlocks. The lasting fix for AV/
+  SmartScreen trust is Authenticode code-signing; until a certificate exists, the
+  above keeps the behaviour indistinguishable from a user running the installer by
+  hand. *Verified by: real install run on a machine with active AV (GUI/OS — see
+  CHANGELOG); `UpdateInstaller.LaunchInstaller` (no shell, no flags, visible) +
+  the codebase carrying no hidden-shell/silent-exec pattern.*
