@@ -63,7 +63,10 @@ try {
     if (-not $hasVersion) {
         $dash = [char]0x2014  # em dash, matching the existing CHANGELOG style
         $date = Get-Date -Format 'yyyy-MM-dd'
-        $stamped = [regex]::Replace($text, "(?m)^## Unreleased[^\r\n]*$", "## $Version $dash $date", 1)
+        # Lookahead (not $) so the match ends BEFORE the line terminator: this
+        # matches a CRLF '## Unreleased\r\n' line (where $ can't anchor before the
+        # \r) and leaves the \r\n intact so the file's CRLF endings are preserved.
+        $stamped = [regex]::Replace($text, "(?m)^## Unreleased[^\r\n]*(?=\r?\n|$)", "## $Version $dash $date", 1)
         if ($stamped -eq $text) {
             Fail "CHANGELOG.md has neither a '## $Version' section nor a '## Unreleased' block to stamp."
         }

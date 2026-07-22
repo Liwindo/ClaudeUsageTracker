@@ -15,14 +15,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $initPath = Join-Path $repoRoot "python\src\claude_usage_monitor\__init__.py"
 $csprojPath = Join-Path $repoRoot "csharp\ClaudeUsageTracker\ClaudeUsageTracker.csproj"
 
+# Check the pattern EXISTS (not "did the text change") so re-running the bump
+# when already at $Version is a harmless no-op instead of a false "not found"
+# throw — that lets a half-finished release be re-run cleanly.
 $init = Get-Content $initPath -Raw -Encoding UTF8
+if ($init -notmatch '__version__ = "\d+(?:\.\d+)*"') { throw "No __version__ line found in $initPath" }
 $newInit = $init -replace '__version__ = "\d+(?:\.\d+)*"', ('__version__ = "' + $Version + '"')
-if ($newInit -eq $init) { throw "No __version__ line found in $initPath" }
 [IO.File]::WriteAllText($initPath, $newInit)
 
 $csproj = Get-Content $csprojPath -Raw -Encoding UTF8
+if ($csproj -notmatch '<Version>\d+(?:\.\d+)*</Version>') { throw "No <Version> element found in $csprojPath" }
 $newCsproj = $csproj -replace '<Version>\d+(?:\.\d+)*</Version>', "<Version>$Version</Version>"
-if ($newCsproj -eq $csproj) { throw "No <Version> element found in $csprojPath" }
 [IO.File]::WriteAllText($csprojPath, $newCsproj)
 
 Push-Location (Join-Path $repoRoot "python")
