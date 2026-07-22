@@ -90,10 +90,14 @@ try {
     $runId = $null
     for ($i = 0; $i -lt 24 -and -not $runId; $i++) {  # up to ~2 min for the run to appear
         Start-Sleep -Seconds 5
-        $runId = gh run list --workflow release.yml --event push -L 20 `
+        # Select the object first, THEN read databaseId only if one was found:
+        # piping an empty result straight into '-ExpandProperty databaseId'
+        # throws "property cannot be found" on the polls before the run appears.
+        $run = gh run list --workflow release.yml --event push -L 20 `
             --json databaseId,headBranch,createdAt |
             ConvertFrom-Json | Where-Object { $_.headBranch -eq $tag } |
-            Sort-Object createdAt -Descending | Select-Object -First 1 -ExpandProperty databaseId
+            Sort-Object createdAt -Descending | Select-Object -First 1
+        if ($run) { $runId = $run.databaseId }
     }
     if (-not $runId) { Fail "Could not find the Release workflow run for $tag. Check GitHub Actions, then run publish_release.ps1 -Tag $tag." }
     gh run watch $runId --exit-status
