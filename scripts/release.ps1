@@ -58,7 +58,10 @@ try {
     #      '## Unreleased' block with today's date (the release workflow requires
     #      a section for this version). ---------------------------------------
     Write-Host "[2/6] Preparing CHANGELOG.md section for $Version" -ForegroundColor Cyan
-    $text = Get-Content $changelog -Raw
+    # -Encoding UTF8 is REQUIRED: Windows PowerShell 5.1's Get-Content defaults to
+    # ANSI/CP1252, which mis-reads this UTF-8 file and corrupts every em-dash/emoji
+    # when the text is written back (garbling the published release notes).
+    $text = Get-Content $changelog -Raw -Encoding UTF8
     $hasVersion = [regex]::IsMatch($text, "(?m)^## \[?$([regex]::Escape($Version))\]?\b")
     if (-not $hasVersion) {
         $dash = [char]0x2014  # em dash, matching the existing CHANGELOG style

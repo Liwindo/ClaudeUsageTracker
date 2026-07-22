@@ -47,7 +47,8 @@ jobs:
         shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
-          $content = Get-Content CHANGELOG.md -Raw
+          # Explicit UTF-8 so em-dashes/emoji in the notes never get mangled.
+          $content = Get-Content CHANGELOG.md -Raw -Encoding UTF8
           $pattern = "(?ms)^## \[?$([regex]::Escape($version))\]?[^\r\n]*\r?\n(.*?)(?=^## |\z)"
           $m = [regex]::Match($content, $pattern)
           if (-not $m.Success -or -not $m.Groups[1].Value.Trim()) {
