@@ -108,6 +108,30 @@ public static class ClaudeClient
     private static string Truncate(string text, int maxLength) =>
         text.Length <= maxLength ? text : text[..maxLength];
 
+    /// <summary>Flatten an exception chain into one diagnostic line. HttpClient
+    /// reports only a generic "An error occurred while sending the request." at the
+    /// top and hides the real cause — DNS, TLS/security-channel, connection
+    /// refused/reset, timeout — in InnerException (a WinHttpException carrying a
+    /// Win32/WINHTTP error code). Surfacing the innermost cause, with that code, is
+    /// the difference between a log we can act on and one that says nothing.</summary>
+    internal static string DescribeException(Exception exc)
+    {
+        var parts = new List<string>();
+        for (Exception? e = exc; e is not null; e = e.InnerException)
+        {
+            var msg = e.Message;
+            // WinHttpException derives from Win32Exception; the NativeErrorCode is
+            // the WINHTTP_* code (12007 = name not resolved, 12175 = security
+            // channel/TLS, 12029 = cannot connect, 12002 = timeout, …).
+            if (e is System.ComponentModel.Win32Exception win32 && win32.NativeErrorCode != 0)
+                msg = $"{msg} (Win32/WinHTTP error {win32.NativeErrorCode})";
+            // Wrappers frequently repeat the inner message verbatim — collapse those.
+            if (!string.IsNullOrWhiteSpace(msg) && (parts.Count == 0 || parts[^1] != msg))
+                parts.Add(msg);
+        }
+        return parts.Count > 0 ? string.Join(" -> ", parts) : exc.GetType().Name;
+    }
+
     private static JsonDocument GetJson(string url, string cookieHeader, string? userAgent, string endpoint)
     {
         Log.Debug("client", $"GET {url}");
@@ -125,7 +149,7 @@ public static class ClaudeClient
         {
             // resp is non-null when the body read failed mid-response.
             resp?.Dispose();
-            throw new ClaudeClientException($"Network error fetching {endpoint}: {exc.Message}", exc);
+            throw new ClaudeClientException($"Network error fetching {endpoint}: {DescribeException(exc)}", exc);
         }
         using (resp)
         {

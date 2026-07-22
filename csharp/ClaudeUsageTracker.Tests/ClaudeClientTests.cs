@@ -98,6 +98,31 @@ public class ClaudeClientTests
         Assert.Equal("unknown", Tier(json));
     }
 
+    // ── network-error diagnostics (the real cause must survive into the log) ──
+
+    [Fact]
+    public void DescribeExceptionSurfacesInnermostCauseAndWinHttpCode()
+    {
+        // HttpClient hands us a generic top-level message; the actual failure
+        // (here WINHTTP name-not-resolved, 12007) lives in the inner exception.
+        // The flattened line must carry BOTH so a recurrence is diagnosable.
+        var inner = new System.ComponentModel.Win32Exception(12007);
+        var exc = new HttpRequestException("An error occurred while sending the request.", inner);
+
+        var desc = ClaudeClient.DescribeException(exc);
+
+        Assert.Contains("An error occurred while sending the request.", desc);
+        Assert.Contains("12007", desc);
+    }
+
+    [Fact]
+    public void DescribeExceptionCollapsesRepeatedMessages()
+    {
+        // Wrapper exceptions often repeat the inner message verbatim.
+        var exc = new Exception("boom", new Exception("boom"));
+        Assert.Equal("boom", ClaudeClient.DescribeException(exc));
+    }
+
     [Fact]
     public void BackoffDoublesAndCapsAtSixteen()
     {
