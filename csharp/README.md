@@ -114,22 +114,26 @@ dialog just opens GitHub.
 
 ### Releasing with a signed manifest
 
-One command does the whole release; the offline key never leaves your machine:
+CI does the release; the only local step is signing, because the offline key must
+never leave your machine.
 
 ```powershell
+# 1. CI: bump both variants, stamp the CHANGELOG, commit, tag, test, build, draft
+gh workflow run release.yml -f version=X.Y.Z     # or: Actions tab → Release → Run workflow
+
+# 2. Local: sign the manifest with the offline key and publish the draft
 $env:CUT_UPDATE_KEY = '<path to your offline key>'; $env:CUT_UPDATE_KEY_PASS = '<passphrase>'
-..\scripts\release.ps1 X.Y.Z
+..\scripts\publish_release.ps1 -Tag vX.Y.Z
 ```
 
-`release.ps1` bumps both variants, stamps the CHANGELOG, commits/tags/pushes,
-**waits for the CI draft build**, then signs `update.json`, **self-verifies**
-against the embedded public key, uploads `update.json(.sig)`, and flips the draft
-to published. `release.yml` builds every tag as a **draft** (CI holds no signing
+`publish_release.ps1` signs `update.json`, **self-verifies** against the embedded
+public key, uploads `update.json(.sig)`, and only then flips the draft to
+published. `release.yml` builds every release as a **draft** (CI holds no signing
 key); because the update check follows `releases/latest` (drafts are invisible to
 it), a forgotten signing step can never ship an unsigned update — the release just
 stays a draft. The `release-integrity` workflow re-verifies every published
-release as a safety net. To resume just the signing step after a mid-way failure:
-`..\scripts\publish_release.ps1 -Tag vX.Y.Z`.
+release as a safety net. `gh workflow run release.yml -f version=X.Y.Z -f dry_run=true`
+rehearses the bump/CHANGELOG/tag step without pushing or building anything.
 
 ## License
 

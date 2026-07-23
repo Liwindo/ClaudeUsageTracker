@@ -286,18 +286,21 @@ app install an attacker's build.**
   install and leave the running app untouched; with no embedded key the feature
   is inert and no update is ever accepted. *Verified by:
   `UpdateVerifierTests.NoEmbeddedKeyFailsClosed` and the malformed-input tests.*
-- **R-update-7** — **Signing can never be forgotten.** CI publishes every release
-  as a **draft**; the update check follows `releases/latest`, which ignores
-  drafts, so no client can see a release without a signed manifest. A release goes
-  live only through local signing with the **offline** key: `scripts/release.ps1`
-  (one command: bump → tag → push → wait for the draft → sign → publish) wrapping
-  `scripts/publish_release.ps1`, which signs, self-verifies against the embedded
-  public key, uploads `update.json(.sig)` and only then publishes. The signing key
+- **R-update-7** — **Signing can never be forgotten.** CI does the whole release
+  — bump, CHANGELOG stamp, commit, tag, test, build — and publishes it as a
+  **draft**; the update check follows `releases/latest`, which ignores drafts, so
+  no client can see a release without a signed manifest. Exactly one step runs on
+  the maintainer's machine, because it is the one step that must never be
+  automatable by CI: `scripts/publish_release.ps1`, which signs `update.json`
+  with the **offline** key, self-verifies against the embedded public key, uploads
+  `update.json(.sig)` and only then flips the draft to published. The signing key
   is never placed in CI (an owner decision: a compromised CI must not be able to
-  sign). A CI **release-integrity** guard independently re-verifies each published
-  release with the app's own verifier and fails if it is unsigned/invalid.
-  *Verified by: `release.yml` (draft), `release.ps1`/`publish_release.ps1`
-  self-verify, `.github/workflows/release-integrity.yml`.*
+  sign) — which is also why the draft→published flip stays local: it is what makes
+  a release visible to `releases/latest`, so it must not happen before a valid
+  signature exists. A CI **release-integrity** guard independently re-verifies each
+  published release with the app's own verifier and fails if it is unsigned/invalid.
+  *Verified by: `release.yml` (workflow_dispatch build → draft),
+  `publish_release.ps1` self-verify, `.github/workflows/release-integrity.yml`.*
 - **R-update-8** — Multiple embedded public keys MUST be supported so a key can be
   rotated (ship a build trusting old+new before signing with the new key).
   *Verified by: `UpdateVerifierTests.SignatureVerifiesUnderAnyEmbeddedKey`.*

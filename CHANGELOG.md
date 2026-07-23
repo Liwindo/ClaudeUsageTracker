@@ -7,6 +7,12 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### 🔧 Changed
+
+- **Network errors in the C# log now name the actual cause.** A failed poll used to log only .NET's generic "An error occurred while sending the request.", which said nothing about *why*. The log line now carries the innermost cause plus the WinHTTP error code — name not resolved, TLS/security channel, cannot connect, timeout — so a recurring problem can be told apart from a passing blip without guesswork.
+
 ## 2.2.2 — 2026-07-22
 
 ### 🔧 Changed
