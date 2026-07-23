@@ -7,7 +7,7 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
-## Unreleased
+## 2.2.3 — 2026-07-23
 
 ### 🔧 Changed
 
