@@ -7,6 +7,17 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### 🔒 Security / hardening
+
+- **The update dialog's "Open GitHub" button now only ever opens a real github.com page.** The release page address was taken from GitHub's API response and opened as-is. In the app's threat model — where even a fully compromised GitHub account must not be able to harm you — that value is untrusted, and the "open" action can do more than open a web page (a local path or `file://`/network value could launch a program). Both variants now verify the address is an `https://github.com/…` URL before opening it and otherwise fall back to the app's own fixed releases page. The cryptographically verified "Download & install" path was never affected.
+- **The C# installer no longer downloads and silently runs the .NET runtime for you** when it's missing. It now opens Microsoft's official, direct runtime download in your browser so you install it yourself — which means Windows checks the installer's Microsoft signature and shows "Microsoft Corporation" as the verified publisher, instead of the setup fetching an executable and running it with admin rights unverified. The link goes straight to the correct download, so there's nothing to hunt for.
+
+### 🐛 Bug fixes
+
+- **Your settings file can no longer be corrupted by a crash or power cut while it is being saved.** The config is now written to a temporary file and swapped into place in a single atomic step, so an interrupted save leaves either your previous settings or the complete new ones — never a half-written `config.toml` that the app would refuse to start from.
+
 ## 2.2.3 — 2026-07-23
 
 ### 🔧 Changed

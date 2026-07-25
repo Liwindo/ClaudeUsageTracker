@@ -136,10 +136,20 @@ class Config:
         }
 
     def save(self) -> None:
-        """Persist current config to TOML."""
+        """Persist current config to TOML.
+
+        Atomic write: a crash or power-loss mid-write must never leave a
+        truncated config.toml that fails to parse on the next start (which would
+        block startup). Write a sibling temp file, then swap it into place with
+        os.replace — an atomic rename on the same volume, so a reader only ever
+        sees the old file or the whole new one. A stale temp from an earlier
+        crash is harmlessly overwritten here.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._path, "wb") as f:
+        tmp = self._path.parent / (self._path.name + ".tmp")
+        with open(tmp, "wb") as f:
             tomli_w.dump(self._to_dict(), f)
+        os.replace(tmp, self._path)
 
     @property
     def firefox_profile(self) -> Path | None:

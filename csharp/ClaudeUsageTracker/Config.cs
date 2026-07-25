@@ -121,7 +121,15 @@ public sealed class Config
                 table[key] = value;
             }
         }
-        File.WriteAllText(_path, TomlSerializer.Serialize(table));
+        // Atomic write: a crash or power-loss mid-write must never leave a
+        // truncated config.toml that fails to parse on the next start (which
+        // would block startup). Write a sibling temp file, then swap it into
+        // place in one move — MoveFileEx on the same volume is atomic, so a
+        // reader only ever sees the old file or the whole new one. A stale
+        // temp from an earlier crash is harmlessly overwritten here.
+        var tmp = _path + ".tmp";
+        File.WriteAllText(tmp, TomlSerializer.Serialize(table));
+        File.Move(tmp, _path, overwrite: true);
     }
 
     private static string GetString(TomlTable model, string key, string fallback) =>

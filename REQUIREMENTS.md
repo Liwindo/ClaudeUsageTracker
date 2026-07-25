@@ -90,6 +90,17 @@ variant's head will be lost again.
   (the .NET sockets handler's fingerprint gets a Cloudflare 403). *Origin: 1.5.1.*
 - **R-net-6** — The first poll result MUST be shown as soon as it arrives, not
   after a fixed delay (no lingering "connecting…"). *Origin: 1.3.0.*
+- **R-net-7** — The release-page URL opened from the update dialog ("Open
+  GitHub") comes from the API response's `html_url`, which is **untrusted** under
+  the compromised-GitHub model (§13). Before it reaches the OS "open" sink
+  (`ShellExecute` / `os.startfile` via `webbrowser.open`) it MUST be validated as
+  an **HTTPS URL whose host is exactly `github.com`**; anything else — another
+  host, a non-HTTPS scheme, or a `file://`/UNC value that the sink would launch
+  as a *program* — MUST be dropped in favour of the app's own constant releases
+  URL. *Verified by: `IsAllowedReleaseUrlAcceptsOnlyHttpsGitHubCom` /
+  `EvaluateFallsBackToCanonicalUrlForHostileReleaseUrl` (C#),
+  `test_is_allowed_release_url` / `test_hostile_html_url_falls_back_to_releases_page`
+  (Py).*
 
 ## 4. Usage-response parsing
 
@@ -176,6 +187,12 @@ variant's head will be lost again.
   *Origin: 1.3.0 / 1.4.0 / 1.5.0.*
 - **R-config-5** — Log entries MUST stay English regardless of UI language so
   logs remain shareable for support. *Origin: 1.5.0.*
+- **R-config-6** — The config file MUST be written **atomically**: serialise to a
+  sibling temp file, then rename it into place (an atomic same-volume move). A
+  crash or power-loss mid-write must never leave a truncated `config.toml` that
+  fails to parse and blocks the next start. *Verified by:
+  `SaveIsAtomicAndLeavesNoTempFile` (C#) /
+  `test_save_is_atomic_and_leaves_no_temp_file` (Py).*
 
 ## 9. Application lifecycle
 
@@ -319,3 +336,16 @@ app install an attacker's build.**
   hand. *Verified by: real install run on a machine with active AV (GUI/OS — see
   CHANGELOG); `UpdateInstaller.LaunchInstaller` (no shell, no flags, visible) +
   the codebase carrying no hidden-shell/silent-exec pattern.*
+- **R-update-10** — *variant-specific (C# installer).* The setup MUST NOT download
+  the .NET Desktop Runtime and execute it elevated itself (fetching an EXE and
+  running it with admin rights without verifying its signature is the same weak
+  link R-update-2 removes for app updates). When the runtime is missing it MUST
+  instead open Microsoft's **official, direct** runtime download in the user's
+  browser (a stable `aka.ms` alias that lands on the correct signed installer, so
+  the user never hunts on the overview page) and let the **user** run it — Windows
+  then enforces the Authenticode signature and shows Microsoft as the verified
+  publisher on the UAC prompt. The app installs regardless and starts once the
+  runtime is present. *Verified by: `ClaudeUsageTracker.iss` (no
+  download-and-Exec; `PromptInstallRuntime` opens the signed download) — ISCC
+  compiles the script incl. all nine message catalogs; the browser-open prompt is
+  a real install-time path (see CHANGELOG).*

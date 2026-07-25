@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import httpx
 
@@ -54,6 +55,24 @@ def _parse_version(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in m.group(1).split("."))
 
 
+def _is_allowed_release_url(url: object) -> bool:
+    """True only for an HTTPS URL whose host is exactly github.com — where GitHub
+    release pages live. The release-page URL comes from the API's ``html_url``,
+    which is untrusted under the "compromised GitHub" model: anything else —
+    another host, a non-HTTPS scheme, or a ``file://``/UNC path that the OS
+    "open" handler (os.startfile) would launch as a program rather than open in a
+    browser — is rejected so the caller falls back to the app's own constant
+    releases URL. See REQUIREMENTS.md R-net-7.
+    """
+    if not isinstance(url, str):
+        return False
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and parsed.hostname == "github.com"
+
+
 def _is_newer(remote: str, local: str) -> bool:
     r, l = _parse_version(remote), _parse_version(local)
     if not r or not l:
@@ -92,7 +111,11 @@ def evaluate_release(
         logger.info("Update %s available but skipped by user preference.", latest)
         return UpdateResult(STATUS_UP_TO_DATE)
 
-    url = str(data.get("html_url") or REPO_RELEASES_URL)
+    # html_url is untrusted (compromised-GitHub model). Only open it if it is an
+    # HTTPS github.com URL; otherwise fall back to our own constant so a hostile
+    # value can never reach os.startfile via webbrowser.open. R-net-7.
+    html_url = data.get("html_url")
+    url = html_url if _is_allowed_release_url(html_url) else REPO_RELEASES_URL
     logger.info("Update available: %s (running %s).", tag, current_version)
     return UpdateResult(STATUS_AVAILABLE, UpdateInfo(latest_version=latest, url=url))
 

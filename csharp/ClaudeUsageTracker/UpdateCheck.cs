@@ -37,6 +37,22 @@ public static partial class UpdateCheck
     [GeneratedRegex(@"^v?(\d+(?:\.\d+)*)")]
     private static partial Regex VersionRegex();
 
+    /// <summary>True only for an HTTPS URL whose host is exactly github.com — the
+    /// host GitHub release pages live on. The release-page URL comes from the API
+    /// response's <c>html_url</c>, which is untrusted under the "compromised
+    /// GitHub" model (§13, R-net-7): anything else — another host, a non-HTTPS
+    /// scheme, or a <c>file://</c>/UNC path that <c>ShellExecute</c> would launch
+    /// as a program rather than open in a browser — is rejected so the caller
+    /// falls back to the app's own constant releases URL. Never throws.</summary>
+    internal static bool IsAllowedReleaseUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) ||
+            !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+        return uri.Scheme == Uri.UriSchemeHttps &&
+               uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>The running app version, e.g. "2.0.0" (from the csproj Version).</summary>
     public static string CurrentVersion
     {
@@ -170,11 +186,15 @@ public static partial class UpdateCheck
                 return UpdateCheckResult.UpToDate;
             }
 
-            var url = doc.RootElement.TryGetProperty("html_url", out var urlEl) &&
-                      urlEl.ValueKind is JsonValueKind.String &&
-                      !string.IsNullOrEmpty(urlEl.GetString())
-                ? urlEl.GetString()!
-                : RepoReleasesUrl;
+            // html_url is untrusted (§13 threat model). Only open it if it is an
+            // HTTPS github.com URL; otherwise fall back to our own constant so a
+            // hostile value can never reach the ShellExecute/os.startfile sink
+            // that opens the release page. R-net-7.
+            var htmlUrl = doc.RootElement.TryGetProperty("html_url", out var urlEl) &&
+                          urlEl.ValueKind is JsonValueKind.String
+                ? urlEl.GetString()
+                : null;
+            var url = IsAllowedReleaseUrl(htmlUrl) ? htmlUrl! : RepoReleasesUrl;
 
             // Asset download URLs (name → browser_download_url) for the in-app
             // installer. Absent/odd shapes are simply skipped; the installer

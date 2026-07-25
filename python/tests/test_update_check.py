@@ -36,11 +36,12 @@ def test_is_newer():
 
 
 def test_newer_release_returns_info():
-    with _with_response(200, {"tag_name": "v99.0.0", "html_url": "https://x/v99"}):
+    good = "https://github.com/Liwindo/ClaudeUsageTracker/releases/tag/v99.0.0"
+    with _with_response(200, {"tag_name": "v99.0.0", "html_url": good}):
         info = uc.check_for_update()
     assert info is not None
     assert info.latest_version == "99.0.0"
-    assert info.url == "https://x/v99"
+    assert info.url == good
 
 
 def test_same_version_returns_none():
@@ -64,6 +65,47 @@ def test_missing_html_url_falls_back_to_releases_page():
     with _with_response(200, {"tag_name": "v99.0.0", "html_url": None}):
         info = uc.check_for_update()
     assert info is not None and info.url == uc.REPO_RELEASES_URL
+
+
+def test_hostile_html_url_falls_back_to_releases_page():
+    # R-net-7: html_url is untrusted (compromised-GitHub model). A non-github
+    # host, a non-HTTPS scheme, or a file://-/UNC value that os.startfile (via
+    # webbrowser.open) would launch as a program must be dropped for the app's
+    # own constant releases URL, so the "open release page" sink stays harmless.
+    for hostile in (
+        "https://evil.example/pwn",
+        "https://github.com.evil.example/x",    # suffix, not the real host
+        "https://github.com@evil.example/x",    # userinfo trick
+        "http://github.com/x",                  # not HTTPS
+        "file:///C:/Windows/System32/cmd.exe",  # os.startfile would RUN it
+        "\\\\attacker\\share\\payload.exe",     # UNC path
+        "javascript:alert(1)",
+    ):
+        result = uc.evaluate_release(
+            {"tag_name": "v99.0.0", "html_url": hostile}, current_version="1.0.0"
+        )
+        assert result.status == uc.STATUS_AVAILABLE
+        assert result.info is not None
+        assert result.info.url == uc.REPO_RELEASES_URL, hostile
+
+
+def test_valid_github_release_url_is_preserved():
+    good = "https://github.com/Liwindo/ClaudeUsageTracker/releases/tag/v99.0.0"
+    result = uc.evaluate_release(
+        {"tag_name": "v99.0.0", "html_url": good}, current_version="1.0.0"
+    )
+    assert result.info is not None and result.info.url == good
+
+
+def test_is_allowed_release_url():
+    assert uc._is_allowed_release_url(
+        "https://github.com/Liwindo/ClaudeUsageTracker/releases/tag/v2.3.0"
+    )
+    assert not uc._is_allowed_release_url("https://evil.example/x")
+    assert not uc._is_allowed_release_url("http://github.com/x")
+    assert not uc._is_allowed_release_url("file:///C:/x.exe")
+    assert not uc._is_allowed_release_url(None)
+    assert not uc._is_allowed_release_url("")
 
 
 def test_non_dict_body_returns_none():

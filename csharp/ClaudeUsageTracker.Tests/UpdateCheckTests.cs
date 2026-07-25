@@ -95,4 +95,48 @@ public class UpdateCheckTests
         Assert.Equal(UpdateCheckStatus.Failed, UpdateCheck.Evaluate("<html>502</html>", "", "2.1.1").Status);
         Assert.Equal(UpdateCheckStatus.Failed, UpdateCheck.Evaluate("[1,2,3]", "", "2.1.1").Status);
     }
+
+    // ── R-net-7: the opened release URL is validated, never trusted verbatim ──
+
+    [Fact]
+    public void EvaluatePreservesAValidGitHubReleaseUrl()
+    {
+        // Body's html_url is on github.com, so it survives the filter unchanged.
+        var result = UpdateCheck.Evaluate(Body, "", "2.1.1");
+        Assert.Equal(UpdateCheckStatus.Available, result.Status);
+        Assert.Equal("https://github.com/x/releases/tag/v9.9.9", result.Info!.Url);
+    }
+
+    // html_url is untrusted under the compromised-GitHub model. A non-github.com
+    // host, a non-HTTPS scheme, or a file://-/UNC value that ShellExecute would
+    // run as a program must be dropped for the app's own constant releases URL —
+    // so the "open release page" sink can never launch an attacker's target.
+    [Theory]
+    [InlineData("https://evil.example/pwn")]
+    [InlineData("https://github.com.evil.example/x")]   // suffix, not the real host
+    [InlineData("https://github.com@evil.example/x")]   // userinfo trick
+    [InlineData("http://github.com/x")]                 // not HTTPS
+    [InlineData("file:///C:/Windows/System32/cmd.exe")] // ShellExecute would RUN it
+    [InlineData("\\\\attacker\\share\\payload.exe")]    // UNC path
+    [InlineData("javascript:alert(1)")]
+    public void EvaluateFallsBackToCanonicalUrlForHostileReleaseUrl(string htmlUrl)
+    {
+        var body =
+            $$"""{"tag_name":"v9.9.9","html_url":{{System.Text.Json.JsonSerializer.Serialize(htmlUrl)}}}""";
+        var result = UpdateCheck.Evaluate(body, "", "2.1.1");
+        Assert.Equal(UpdateCheckStatus.Available, result.Status);
+        Assert.Equal(UpdateCheck.RepoReleasesUrl, result.Info!.Url);
+    }
+
+    [Fact]
+    public void IsAllowedReleaseUrlAcceptsOnlyHttpsGitHubCom()
+    {
+        Assert.True(UpdateCheck.IsAllowedReleaseUrl(
+            "https://github.com/Liwindo/ClaudeUsageTracker/releases/tag/v2.3.0"));
+        Assert.False(UpdateCheck.IsAllowedReleaseUrl("https://evil.example/x"));
+        Assert.False(UpdateCheck.IsAllowedReleaseUrl("http://github.com/x"));
+        Assert.False(UpdateCheck.IsAllowedReleaseUrl("file:///C:/x.exe"));
+        Assert.False(UpdateCheck.IsAllowedReleaseUrl(null));
+        Assert.False(UpdateCheck.IsAllowedReleaseUrl("   "));
+    }
 }

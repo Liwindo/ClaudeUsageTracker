@@ -2,8 +2,12 @@
 ;
 ; Payload is the framework-dependent single-file publish (publish\fdd): the
 ; installer stays ~5 MB and instead detects the .NET Desktop Runtime 10 at
-; install time, downloading the official runtime installer if it is missing.
-; (The portable download covers the "no dependencies at all" case.)
+; install time. If it is missing, the installer opens Microsoft's official,
+; code-signed runtime download directly in the user's browser rather than
+; fetching an EXE and running it elevated itself — Windows then enforces the
+; Authenticode signature and shows Microsoft as the verified publisher on the
+; user's own action. (The portable download covers the "no dependencies at all"
+; case.)
 ;
 ; Runtime detection is done on the file system, NOT via the registry: the
 ; HKLM\SOFTWARE\dotnet\Setup\InstalledVersions key is only written by some
@@ -29,7 +33,12 @@
 #define MyAppExeName "ClaudeUsageTrackerCS.exe"
 #define MyAppPublisher "Liwindo"
 #define MyAppURL "https://github.com/Liwindo/ClaudeUsageTracker"
-#define DotNetURL "https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe"
+; Direct aka.ms alias for the latest 10.0 Windows Desktop Runtime x64 installer —
+; opening it drops the user straight onto the correct, Microsoft-signed download
+; (no hunting on the overview page). The USER runs it, so Windows enforces the
+; Authenticode signature; this installer never fetches and executes it itself.
+#define DotNetDownloadUrl "https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe"
+; Human-readable overview page, shown as a fallback link in the prompt.
 #define DotNetPage "https://dotnet.microsoft.com/download/dotnet/10.0"
 
 [Setup]
@@ -78,15 +87,15 @@ dutch.AutostartTask=Automatisch starten bij aanmelden bij Windows
 polish.AutostartTask=Uruchamiaj automatycznie po zalogowaniu do systemu Windows
 portuguese.AutostartTask=Iniciar automaticamente ao entrar no Windows
 russian.AutostartTask=Запускать автоматически при входе в Windows
-DotNetFailed=The .NET Desktop Runtime 10 could not be installed. %1 will not start without it.%nYou can install it manually from:%n%2
-german.DotNetFailed=Die .NET Desktop Runtime 10 konnte nicht installiert werden. %1 startet ohne sie nicht.%nManuelle Installation:%n%2
-spanish.DotNetFailed=No se pudo instalar el runtime de escritorio de .NET 10. %1 no se iniciará sin él.%nInstalación manual:%n%2
-french.DotNetFailed=Le runtime .NET Desktop 10 n'a pas pu être installé. %1 ne démarrera pas sans lui.%nInstallation manuelle :%n%2
-italian.DotNetFailed=Impossibile installare il runtime desktop .NET 10. %1 non si avvierà senza di esso.%nInstallazione manuale:%n%2
-dutch.DotNetFailed=De .NET Desktop Runtime 10 kon niet worden geïnstalleerd. %1 start niet zonder deze runtime.%nHandmatige installatie:%n%2
-polish.DotNetFailed=Nie udało się zainstalować środowiska .NET Desktop Runtime 10. %1 nie uruchomi się bez niego.%nInstalacja ręczna:%n%2
-portuguese.DotNetFailed=Não foi possível instalar o .NET Desktop Runtime 10. O %1 não iniciará sem ele.%nInstalação manual:%n%2
-russian.DotNetFailed=Не удалось установить .NET Desktop Runtime 10. %1 не запустится без него.%nУстановить вручную:%n%2
+DotNetRequired=%1 needs the .NET Desktop Runtime 10. The official Microsoft installer will now download in your browser — run it, then start %1.%nIf the download doesn't start, get it here:%n%2
+german.DotNetRequired=%1 benötigt die .NET Desktop Runtime 10. Der offizielle Microsoft-Installer wird jetzt in Ihrem Browser heruntergeladen — führen Sie ihn aus und starten Sie dann %1.%nFalls der Download nicht startet, hier herunterladen:%n%2
+spanish.DotNetRequired=%1 necesita .NET Desktop Runtime 10. El instalador oficial de Microsoft se descargará ahora en su navegador: ejecútelo y luego inicie %1.%nSi la descarga no comienza, obténgalo aquí:%n%2
+french.DotNetRequired=%1 nécessite le .NET Desktop Runtime 10. Le programme d'installation officiel de Microsoft va être téléchargé dans votre navigateur — exécutez-le, puis démarrez %1.%nSi le téléchargement ne démarre pas, obtenez-le ici :%n%2
+italian.DotNetRequired=%1 richiede .NET Desktop Runtime 10. Il programma di installazione ufficiale di Microsoft verrà ora scaricato nel browser: eseguilo, quindi avvia %1.%nSe il download non si avvia, scaricalo qui:%n%2
+dutch.DotNetRequired=%1 heeft .NET Desktop Runtime 10 nodig. Het officiële Microsoft-installatieprogramma wordt nu in uw browser gedownload — voer het uit en start daarna %1.%nAls de download niet start, haal het hier op:%n%2
+polish.DotNetRequired=%1 wymaga środowiska .NET Desktop Runtime 10. Oficjalny instalator Microsoft zostanie teraz pobrany w przeglądarce — uruchom go, a następnie uruchom %1.%nJeśli pobieranie się nie rozpocznie, pobierz go tutaj:%n%2
+portuguese.DotNetRequired=O %1 precisa do .NET Desktop Runtime 10. O instalador oficial da Microsoft será baixado agora no seu navegador — execute-o e depois inicie o %1.%nSe o download não começar, obtenha-o aqui:%n%2
+russian.DotNetRequired=Для %1 требуется .NET Desktop Runtime 10. Официальный установщик Microsoft сейчас загрузится в вашем браузере — запустите его, затем запустите %1.%nЕсли загрузка не началась, скачайте здесь:%n%2
 
 [Tasks]
 Name: "autostart"; Description: "{cm:AutostartTask}"
@@ -109,9 +118,6 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 Filename: "{sys}\taskkill.exe"; Parameters: "/f /im {#MyAppExeName}"; Flags: runhidden skipifdoesntexist; RunOnceId: "KillTracker"
 
 [Code]
-var
-  DownloadPage: TDownloadWizardPage;
-
 function DirHasDesktopRuntime10(const DotnetRoot: String): Boolean;
 var
   FR: TFindRec;
@@ -140,49 +146,32 @@ begin
     Result := DirHasDesktopRuntime10(GetEnv('DOTNET_ROOT'));
 end;
 
-procedure InitializeWizard;
-begin
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing),
-    SetupMessage(msgPreparingDesc), nil);
-end;
-
-procedure ReportRuntimeFailure;
+// The runtime is installed by the USER from Microsoft's official, code-signed
+// download page — this installer deliberately does NOT fetch an EXE and run it
+// elevated itself. Downloading an executable and running it with admin rights
+// without verifying its signature is the weak link this avoids: when the user
+// installs the runtime from Microsoft's page, Windows enforces the Authenticode
+// signature and shows "Microsoft Corporation" as the verified publisher on the
+// UAC prompt. See REQUIREMENTS.md R-update-10.
+procedure PromptInstallRuntime;
 var
   ErrorCode: Integer;
 begin
-  MsgBox(FmtMessage(CustomMessage('DotNetFailed'), ['{#MyAppName}', '{#DotNetPage}']),
-    mbError, MB_OK);
-  ShellExec('open', '{#DotNetPage}', '', '', SW_SHOW, ewNoWait, ErrorCode);
+  MsgBox(FmtMessage(CustomMessage('DotNetRequired'), ['{#MyAppName}', '{#DotNetPage}']),
+    mbInformation, MB_OK);
+  // Open the direct aka.ms installer link so the correct, Microsoft-signed
+  // runtime downloads immediately — no hunting on the overview page.
+  ShellExec('open', '{#DotNetDownloadUrl}', '', '', SW_SHOW, ewNoWait, ErrorCode);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
-var
-  ResultCode: Integer;
 begin
   Result := True;
+  // Point the user at Microsoft's official download page when the runtime is
+  // missing, then install the app regardless (it starts once the runtime is
+  // present).
   if (CurPageID = wpReady) and (not RuntimeInstalled) then
-  begin
-    DownloadPage.Clear;
-    DownloadPage.Add('{#DotNetURL}', 'windowsdesktop-runtime.exe', '');
-    DownloadPage.Show;
-    try
-      try
-        DownloadPage.Download;
-        // The Microsoft installer elevates itself (UAC prompt).
-        if not Exec(ExpandConstant('{tmp}\windowsdesktop-runtime.exe'),
-          '/install /quiet /norestart', '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
-          ResultCode := 1;
-      except
-        ResultCode := 1;
-      end;
-    finally
-      DownloadPage.Hide;
-    end;
-    // 3010 = success, reboot required — fine for a runtime.
-    if (not RuntimeInstalled) and (ResultCode <> 0) and (ResultCode <> 3010) then
-      ReportRuntimeFailure;
-    // Install the app regardless: it will run once the runtime is present.
-  end;
+    PromptInstallRuntime;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

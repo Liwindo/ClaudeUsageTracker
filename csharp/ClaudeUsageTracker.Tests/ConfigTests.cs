@@ -116,6 +116,31 @@ public class ConfigTests : IDisposable
     }
 
     [Fact]
+    public void SaveIsAtomicAndLeavesNoTempFile()
+    {
+        // The write goes through a sibling temp + atomic move, so a crash can
+        // never leave a half-written config.toml. Prove the temp is swapped
+        // away (not left behind) on both first-run and overwrite, and that a
+        // stale temp from an earlier crash does not corrupt the next save.
+        var path = PathFor("config.toml");
+        var tmp = path + ".tmp";
+
+        var cfg = Config.Load(path); // first-run write
+        Assert.False(File.Exists(tmp));
+
+        cfg.Language = "fr";
+        cfg.Save(); // overwrite an existing file
+        Assert.False(File.Exists(tmp));
+        Assert.Equal("fr", Config.Load(path).Language);
+
+        File.WriteAllText(tmp, "garbage that is not valid toml");
+        cfg.Language = "it";
+        cfg.Save();
+        Assert.False(File.Exists(tmp));
+        Assert.Equal("it", Config.Load(path).Language);
+    }
+
+    [Fact]
     public void MigrationAddsMissingKeys()
     {
         var path = PathFor("config.toml");

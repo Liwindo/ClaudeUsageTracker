@@ -43,6 +43,29 @@ def test_complete_file_is_not_rewritten(tmp_path):
     assert path.stat().st_mtime_ns == mtime
 
 
+def test_save_is_atomic_and_leaves_no_temp_file(tmp_path):
+    # The write goes through a sibling temp + os.replace, so a crash can never
+    # leave a half-written config.toml. Prove the temp is swapped away (not left
+    # behind) on both first-run and overwrite, and that a stale temp from an
+    # earlier crash does not corrupt the next save.
+    path = tmp_path / "config.toml"
+    tmp = tmp_path / "config.toml.tmp"
+
+    cfg = Config.load(path)  # first-run write
+    assert not tmp.exists()
+
+    cfg.language = "fr"
+    cfg.save()  # overwrite an existing file
+    assert not tmp.exists()
+    assert Config.load(path).language == "fr"
+
+    tmp.write_text("garbage that is not valid toml")
+    cfg.language = "it"
+    cfg.save()
+    assert not tmp.exists()
+    assert Config.load(path).language == "it"
+
+
 def test_poll_interval_is_floored_at_10(tmp_path):
     path = tmp_path / "config.toml"
     path.write_bytes(b"poll_interval_seconds = 0\n")
