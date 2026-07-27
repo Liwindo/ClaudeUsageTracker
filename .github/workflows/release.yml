@@ -83,7 +83,7 @@ jobs:
           "proceed=$proceed" | Out-File $env:GITHUB_OUTPUT -Append
           Write-Host "tag=$tag version=$version proceed=$proceed"
 
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         if: github.event_name == 'workflow_dispatch'
 
       - name: Bump both variants
@@ -222,7 +222,7 @@ jobs:
 
       # Non-immutable actions: pinned to commit SHAs (CodeQL supply-chain
       # hardening — tags can be moved, SHAs cannot).
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Install dependencies
         run: uv sync --extra dev
