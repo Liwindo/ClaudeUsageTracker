@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- GitHub's automatic dependency submission restores every .csproj on an
+         ubuntu runner. Without this the net10.0-windows projects abort with
+         NETSDK1100 and no NuGet snapshot is submitted, so transitive packages
+         stay invisible to Dependabot. Lets restore pull the Windows targeting
+         packs from NuGet; a no-op on Windows, where they ship with the SDK. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>
