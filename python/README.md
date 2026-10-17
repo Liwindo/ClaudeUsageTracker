@@ -71,9 +71,10 @@ poll_interval_seconds = 30
 notification_thresholds = [80, 95]
 
 # Log level: DEBUG, INFO, WARNING, ERROR.
-# Note: at DEBUG level the full claude.ai /usage response (including
-# organisation UUID and bucket data) is written to app.log. Keep WARNING
-# unless you're actively debugging, and review the log before sharing it.
+# Note: from INFO on, app.log records each request URL, which contains your
+# organisation UUID; at DEBUG the full claude.ai /usage response (bucket data)
+# is written too. Keep WARNING unless you're actively debugging, and review
+# the log before sharing it.
 log_level = "WARNING"
 
 # Override the Firefox profile directory (leave empty for auto-detection), e.g.

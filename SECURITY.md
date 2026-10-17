@@ -4,10 +4,10 @@
 
 | Version | Security updates |
 |---------|-----------------|
-| 1.x (latest) | ✅ Yes |
-| < 1.0 | ❌ No |
+| 2.x (latest) | ✅ Yes |
+| < 2.0 | ❌ No |
 
-Only the latest release receives security fixes. Please update before reporting.
+Only the latest release receives security fixes. Both variants (the Python EXE and the C# installer/portable version) are released together under one version number. Please update before reporting.
 
 ---
 
@@ -20,7 +20,8 @@ This tool reads Firefox cookies from your local SQLite database and calls intern
 - SQL injection in the Firefox cookie database query
 - Insecure HTTP behaviour (missing TLS verification, redirect following to untrusted hosts)
 - Privilege escalation or code execution through the Windows tray or widget
-- Sensitive data written to log files or the config directory (`%APPDATA%\claude-usage-monitor\`)
+- Getting the C# in-app updater to download from a non-GitHub host, or to install a file whose signed manifest or digest does not verify
+- Sensitive data written to log files or the config directories (`%APPDATA%\claude-usage-monitor\` for the Python variant, `%APPDATA%\claude-usage-tracker-cs\` for the C# variant)
 
 The following are **out of scope**:
 
@@ -48,7 +49,7 @@ Alternatively, you can reach out directly via the GitHub profile of the maintain
 A useful report contains:
 
 - A clear description of the vulnerability and its potential impact
-- Steps to reproduce (operating system, Python version, browser version if relevant)
+- Steps to reproduce: which variant and version (Python EXE, C# installer or C# portable), Windows version, and browser version if relevant
 - Affected file(s) and line numbers if known
 - A proof-of-concept or example config if applicable
 
@@ -76,13 +77,16 @@ This project follows **coordinated disclosure**. Please allow reasonable time fo
 A few aspects of this project are intentional but worth understanding from a security perspective:
 
 **Firefox cookies are read in-process, without copying the file.**
-The tool opens `cookies.sqlite` read-only using a WAL-mode SQLite connection. Cookie values are held in memory only for the duration of each poll and are never written to disk.
+Both variants open `cookies.sqlite` read-only (SQLite `mode=ro` / `SqliteOpenMode.ReadOnly`); Firefox's WAL journal lets this coexist with a running browser. Cookie values are held in memory only for the duration of each poll and are never written to disk.
 
 **No credentials are stored.**
-The tool does not persist cookies, tokens, or passwords. The config file (`config.toml`) stores only poll interval, log level, and an optional profile path.
+The tool does not persist cookies, tokens, or passwords. The config files hold settings only: poll interval, notification thresholds, log level, an optional Firefox profile path and User-Agent, update preferences, autostart and language. More verbose log levels record the organisation UUID in request URLs (Python variant from `INFO`, C# variant from `DEBUG`), and the Python variant's `DEBUG` level also logs the full usage response, so the default is `WARNING`.
 
-**Network requests go only to `claude.ai`.**
-The tool makes HTTPS requests exclusively to `https://claude.ai`. No data is sent to any other host.
+**Cookies and usage data go only to `claude.ai`.**
+Usage data is fetched over HTTPS from `https://claude.ai` only. Besides that, each app start makes one anonymous request to `api.github.com` for the latest release version. It carries no cookies and no usage data, and `update_check = false` turns it off. The Python variant and the C# portable version only open the GitHub release page in your browser when you choose to update.
+
+**In-app updates are signed with an offline key (C# installer version).**
+The installed C# version can download and install an update itself. It downloads only from `github.com` / `*.githubusercontent.com`, and runs the installer only after verifying an ECDSA P-256 signature over the release manifest plus the installer's SHA-256 digest. The signing key is kept offline and never reaches CI, so a compromised build pipeline or GitHub account cannot produce an update the app accepts. The installer starts as a normal, visible setup wizard. A CI job additionally re-verifies every published release's signature.
 
 **The `claude.ai` endpoints used are undocumented.**
 This is a known limitation described in the README. These endpoints may change without notice and are not endorsed by Anthropic.

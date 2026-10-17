@@ -14,8 +14,9 @@ updates:
       - dependency-name: pyinstaller
         update-types: ["version-update:semver-major"]
 
-  # NuGet bumps for the C# variant. No automerge: ci-csharp.yml runs the
-  # xunit suite on these PRs, but merging stays a manual review step.
+  # NuGet bumps for the C# variant. ci-csharp.yml runs the xunit suite on
+  # these PRs; its automerge job squash-merges patch/minor bumps once that
+  # passes, majors (e.g. the Tomlyn 2.x migration) stay a manual review.
   - package-ecosystem: nuget
     directory: "/csharp"
     schedule:

@@ -49,7 +49,9 @@ The tool reads your existing claude.ai session cookies directly from Firefox's c
 python/    the Python variant (source, tests, PyInstaller build)
 csharp/    the C# variant (source, tests, installer, release build)
 scripts/   shared tooling: locale export/check, lockstep version bump,
-           changelog guard, dependency validation
+           changelog guard, dependency validation, update-key setup and
+           release signing, shipped-dependency report for the dependency graph
+.github/   CI, release and supply-chain workflows, Dependabot config
 docs/      screenshots
 ```
 
