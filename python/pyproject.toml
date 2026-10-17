@@ -32,3 +32,10 @@ path = "src/claude_usage_monitor/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/claude_usage_monitor"]
+
+[tool.uv]
+# The EXE's TLS fingerprint comes from the interpreter's bundled OpenSSL, and
+# Cloudflare blocks some builds with 403 on claude.ai. .python-version pins the
+# version; this pins the BUILD: always uv's own CPython, never a runner's
+# toolcache Python of the same version (which uv would otherwise pick up).
+python-preference = "only-managed"
