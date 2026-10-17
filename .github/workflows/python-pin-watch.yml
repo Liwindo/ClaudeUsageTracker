@@ -1,0 +1,54 @@
+name: Python pin watch
+
+# The Python EXE bundles its interpreter, and no GitHub advisory ecosystem
+# covers CPython, so Dependabot can never raise an alert for it. This job goes
+# red once uv offers a newer CPython patch release of the pinned minor version
+# than python/.python-version - the signal to bump and cut a release.
+#
+# Bumping is not a routine change: Cloudflare fingerprints the TLS ClientHello,
+# which comes from the interpreter build's bundled OpenSSL (see the v1.5.1
+# CHANGELOG entry and scripts/validate_dependencies.py). It is deliberately
+# NOT part of validate_dependencies.py: that gate runs on every push, and a
+# new CPython release would block every Dependabot automerge until bumped.
+
+on:
+  schedule:
+    - cron: '41 5 * * 1'   # weekly, Monday morning
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Non-immutable action: pinned to a commit SHA (CodeQL supply-chain
+      # hardening — tags can be moved, SHAs cannot). Dependabot bumps the SHA
+      # and the trailing version marker; keep this comment version-free.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Compare the pin with the newest uv-managed CPython
+        shell: bash
+        run: |
+          set -euo pipefail
+          pinned=$(tr -d '\r\n' < python/.python-version)
+          minor="${pinned%.*}"
+          # Same source the build uses: uv's own CPython downloads for this platform.
+          latest=$(uv python list "$minor" --only-downloads --output-format json | python -c "
+          import json, sys
+          v = [x['version'] for x in json.load(sys.stdin)
+               if x['implementation'] == 'cpython' and x['variant'] == 'default']
+          print(max(v, key=lambda s: tuple(map(int, s.split('.')))) if v else '')
+          ")
+          if [ -z "$latest" ]; then
+            echo "::error::uv lists no CPython $minor download - check python/.python-version ($pinned)"
+            exit 1
+          fi
+          if [ "$latest" != "$pinned" ]; then
+            echo "::error::CPython $latest is available, python/.python-version pins $pinned. Bump it, confirm the CI log says 'Downloaded cpython-$latest-windows-x86_64-none', and verify a real claude.ai poll with the new interpreter before releasing."
+            exit 1
+          fi
+          echo "python/.python-version ($pinned) is the newest uv-managed CPython $minor."

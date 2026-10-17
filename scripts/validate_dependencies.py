@@ -28,6 +28,10 @@ Checks, per component:
     - The interpreter running this script matches the pin exactly. The pin is
       load-bearing: GitHub runners' default Python has an OpenSSL TLS
       fingerprint that Cloudflare blocks with 403 on claude.ai requests.
+    - The interpreter is uv's own CPython build, not a runner toolcache Python
+      of the same version. A matching version number is not enough: a
+      different build bundles a different OpenSSL. pyproject.toml's
+      python-preference = "only-managed" ensures this; the check proves it.
 
 The Python package itself (pyproject.toml + uv.lock) is covered by separate
 CI steps: "uv lock --check" proves the lockfile matches pyproject.toml, the
@@ -223,6 +227,25 @@ def check_python_pin(root: Path, running: str | None = None) -> list[str]:
     return []
 
 
+# uv installs its CPython builds into directories named like
+# "cpython-3.14.8-windows-x86_64-none"; a runner toolcache Python lives under
+# ...\hostedtoolcache\windows\Python\3.14.8\x64 instead.
+UV_MANAGED_DIR_RE = re.compile(r"^cpython-\d+\.\d+\.\d+-")
+
+
+def check_python_build(base_prefix: str | None = None) -> list[str]:
+    base = (base_prefix or sys.base_prefix).rstrip("\\/")
+    name = re.split(r"[\\/]", base)[-1]
+    if not UV_MANAGED_DIR_RE.match(name):
+        return [
+            f"Python at {base} is not uv's own CPython build — a runner/toolcache"
+            " Python of the same version bundles a different OpenSSL, whose TLS"
+            " fingerprint Cloudflare may block (HTTP 403, the v1.5.0 failure);"
+            ' keep [tool.uv] python-preference = "only-managed" in python/pyproject.toml'
+        ]
+    return []
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offline", action="store_true", help="skip GitHub API pin verification")
@@ -246,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         findings.extend(verify_pins_against_tags(all_refs))
     findings.extend(check_dependabot_config(args.root))
     findings.extend(check_python_pin(args.root))
+    findings.extend(check_python_build())
 
     for finding in findings:
         print(f"FAIL: {finding}")

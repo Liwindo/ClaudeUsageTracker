@@ -217,6 +217,33 @@ def test_interpreter_matches_repo_python_pin():
     assert vd.check_python_pin(REPO_ROOT) == []
 
 
+# --- check_python_build -------------------------------------------------------
+
+def test_toolcache_python_of_the_pinned_version_is_a_finding():
+    # The exact interpreter CI picked for commit 0bdd91f: right version, wrong
+    # build — check_python_pin passed it, this check must not.
+    findings = vd.check_python_build(r"C:\hostedtoolcache\windows\Python\3.14.8\x64")
+    assert len(findings) == 1
+    assert "hostedtoolcache" in findings[0]
+    assert "only-managed" in findings[0]
+
+
+def test_uv_managed_python_passes():
+    base = r"C:\Users\runneradmin\AppData\Roaming\uv\python\cpython-3.14.8-windows-x86_64-none"
+    assert vd.check_python_build(base) == []
+
+
+def test_trailing_separator_does_not_hide_the_build_dir():
+    base = r"C:\Users\runneradmin\AppData\Roaming\uv\python\cpython-3.14.8-windows-x86_64-none" + "\\"
+    assert vd.check_python_build(base) == []
+
+
+def test_interpreter_is_uv_managed():
+    # Live guard: pytest runs in release.yml before PyInstaller, so a release
+    # build on the wrong interpreter stops here instead of shipping an EXE.
+    assert vd.check_python_build() == []
+
+
 # --- main (end to end against the real repo) ---------------------------------
 
 def test_main_offline_passes_on_this_repo(capsys):
