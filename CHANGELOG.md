@@ -7,6 +7,16 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.
+
+### 🔒 Security / hardening
+
+- **The portable C# version now ships the current .NET runtime (10.0.13).** The portable EXE carries its own copy of .NET and WPF. 2.2.4 included version 10.0.10, which is affected by 23 published Microsoft security advisories. Each was checked against what the app does, and no way was found to trigger any of them through it: the app opens no documents, XAML, XPS or font files, prints nothing, uses no XML and loads only its own built-in images. The bundled copy is updated anyway, so its safety no longer rests on that analysis. The installer version uses the .NET Desktop Runtime installed on your PC instead; keep that up to date through Windows Update or [Microsoft's download page](https://dotnet.microsoft.com/download/dotnet/10.0).
+- **The Python version is now built with Python 3.14.8 (was 3.14.4).** Its upstream releases include security fixes, among others in the `ssl` and `urllib` modules, in `tarfile`/`zipfile` and in the bundled XML parser. Before the switch, a real request confirmed that claude.ai still accepts connections made with the new version. This matters because an earlier change of the build Python caused constant "Session expired" errors (see 1.5.1).
+- **Updated bundled libraries.** C# version: Microsoft.Data.Sqlite and System.Net.Http.WinHttpHandler 10.0.12, SQLitePCLRaw 3.0.5. Python version: anyio 4.14.2 (contains a security fix), tzdata 2026.5, and the PyInstaller build tool 6.22.3.
+
 ## 2.2.4 — 2026-07-25
 
 ### 🔒 Security / hardening
