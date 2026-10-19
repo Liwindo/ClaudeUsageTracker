@@ -50,7 +50,6 @@ python/    the Python variant (source, tests, PyInstaller build)
 csharp/    the C# variant (source, tests, installer, release build)
 scripts/   shared tooling: locale sync, version bump, release signing, checks (scripts/README.md)
 .github/   CI, release and supply-chain workflows (.github/workflows/README.md), Dependabot config
-.claude/   Claude Code project settings: the commit hook that requires a doc review
 docs/      screenshots
 ```
 
