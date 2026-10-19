@@ -89,8 +89,9 @@ user_agent = ""
 
 # Check GitHub once per app start for a newer release. If one is found, a
 # dialog shows what changed since your version and offers to open the
-# release page, skip that release, or cancel. Set to false to
-# disable the check entirely — no request is made to GitHub then.
+# release page, skip that release, or cancel. Set to false to turn this
+# automatic check off; GitHub is then only asked when you choose
+# "Check for updates" or "Release notes" in the tray menu.
 update_check = true
 
 # Set automatically by the update dialog's "Skip version" button; that
