@@ -25,6 +25,7 @@ from .update_check import (
     STATUS_UP_TO_DATE,
     check_detailed,
     check_for_update,
+    fetch_release_history,
 )
 from .widget import Widget
 
@@ -46,6 +47,7 @@ class App:
             on_click_open=self._widget.toggle,
             on_click_refresh=self._on_refresh_requested,
             on_check_updates=self._on_check_updates_requested,
+            on_release_notes=self._on_release_notes_requested,
             on_quit=self._quit,
         )
 
@@ -128,6 +130,14 @@ class App:
                 tr("update.check_failed"),
                 kind="warning",
             )
+
+    def _on_release_notes_requested(self) -> None:
+        """Tray "Release notes": the notes of every release, read live from
+        GitHub on a daemon thread, then the dialog in its read-only mode."""
+        threading.Thread(
+            target=lambda: self._widget.show_release_notes(fetch_release_history()),
+            daemon=True, name="release-notes",
+        ).start()
 
     def _skip_update(self, version: str) -> None:
         """Persist the user's choice to skip *version* (update dialog button)."""

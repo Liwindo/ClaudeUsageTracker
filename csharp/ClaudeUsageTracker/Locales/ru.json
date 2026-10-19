@@ -86,5 +86,8 @@
   "update.latest": "последняя",
   "update.installed": "установлена",
   "widget.forecast.lasts": "хватит до сброса",
-  "widget.forecast.runs_out": "лимит через {countdown}"
+  "widget.forecast.runs_out": "лимит через {countdown}",
+  "tray.menu.release_notes": "Примечания к выпуску",
+  "update.notes_title": "Примечания к выпуску",
+  "update.close": "Закрыть"
 }

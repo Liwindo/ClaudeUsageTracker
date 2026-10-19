@@ -12,6 +12,7 @@ must satisfy — the invariants a fix establishes — lives in
 ### ✨ New features
 
 - **The widget now tells you whether your session limit will last.** Behind "Session" above the session bar it shows "· lasts until reset", or, if your pace of the last 30 minutes would use up the limit before it resets, "· limit in 1h 20m" in orange. It needs about 10 minutes of data after the app starts or a new 5-hour window begins, and shows nothing until then. It is calculated from the values the app already fetches, so it makes no extra requests. If the widget is made too narrow for the text, the forecast is hidden rather than cut off.
+- **Release notes in the tray menu.** "Release notes" opens the notes of every version at any time, with the one you are running selected. Like the update dialog, it loads them live from GitHub when you open it.
 - **The update dialog now shows what changed.** Before you update, the dialog lists every version between the one you are running and the one on offer, newest first; click one (or use the arrow keys) to read its release notes. If you skipped a few updates, you see all of them, not just the latest. The text is loaded live from the GitHub releases, so it is always the current release text. It is shown as plain text: links in it cannot be clicked, the "Open GitHub" button stays the only way to the release page. If the notes cannot be loaded, the dialog still opens and says so.
 
 ### 💄 UI

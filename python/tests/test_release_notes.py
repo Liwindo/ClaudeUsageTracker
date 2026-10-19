@@ -59,6 +59,19 @@ def test_select_cases(case):
         assert _spans(notes.versions[0].blocks[0].spans) == case["first_block"]
 
 
+@pytest.mark.parametrize("case", CASES["history"], ids=lambda c: c["name"])
+def test_history_cases(case):
+    notes = rn.select_history(case["releases"])
+    if case["expected_versions"] is None:
+        assert notes is None
+        return
+    assert notes is not None
+    assert [v.version for v in notes.versions] == case["expected_versions"]
+    assert notes.truncated is case["truncated"]
+    if "first_block" in case:
+        assert _spans(notes.versions[0].blocks[0].spans) == case["first_block"]
+
+
 def test_real_releases_parse_as_expected():
     """The actual GitHub release bodies (BOM in v1.3.0, CRLF and LF bodies, the
     'Full Changelog' footer, nested bullets) parse to the recorded result."""

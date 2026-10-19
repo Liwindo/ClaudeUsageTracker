@@ -1,5 +1,7 @@
 // The update dialog: the offered versions on the left, the selected version's
-// release notes on the right (REQUIREMENTS.md R-life-6 / R-life-7).
+// release notes on the right (REQUIREMENTS.md R-life-6 / R-life-7). With
+// history: true it is the tray menu's read-only "Release notes" view
+// (R-life-8): every release, the installed one selected, no update actions.
 //
 // Layout and colours match python/src/claude_usage_monitor/update_dialog.py;
 // only the corners differ (tkinter cannot round them). The window is
@@ -60,18 +62,22 @@ internal sealed class UpdateDialog : Window
     private readonly List<Button> _rows = [];
     private readonly TextBlock _title = new() { FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Solid(TextColor) };
     private readonly Border _chip;
+    private readonly Border _installedChip;
+    private readonly bool _history;
     private readonly StackPanel _notesPanel = new() { Margin = new Thickness(0, 0, 12, 10) };
     private readonly ScrollViewer _notesScroll;
     private readonly FrameworkElement _sidebar;
     private int _selected;
 
-    public UpdateDialog(UpdateInfo info, string versionFloor, Action? onSkip, Action onQuit)
+    public UpdateDialog(UpdateInfo info, string versionFloor, Action? onSkip, Action onQuit,
+        bool history = false)
     {
         _info = info;
         _latest = info.LatestVersion;
         _notes = info.Notes;
+        _history = history;
 
-        Title = I18n.Tr("update.window_title");
+        Title = I18n.Tr(history ? "update.notes_title" : "update.window_title");
         Background = Solid(Bg);
         FontFamily = Segoe;
         Width = DefaultWidth;
@@ -103,6 +109,22 @@ internal sealed class UpdateDialog : Window
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = Solid(Ok),
+            },
+        };
+        _installedChip = new Border
+        {
+            Background = Solid(BtnBg),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(8, 2, 8, 2),
+            Margin = new Thickness(10, 3, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock
+            {
+                Text = I18n.Tr("update.installed"),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Solid(Dim),
             },
         };
         _notesScroll = new ScrollViewer
@@ -141,7 +163,10 @@ internal sealed class UpdateDialog : Window
                 Select(_selected + 1);
         };
         if (_notes is not null)
-            Select(0);
+        {
+            var installed = _notes.Versions.ToList().FindIndex(v => v.Version == UpdateCheck.CurrentVersion);
+            Select(Math.Max(0, installed));
+        }
     }
 
     // ── Building ─────────────────────────────────────────────────────────────
@@ -187,13 +212,18 @@ internal sealed class UpdateDialog : Window
         }
         var brand = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         brand.Children.Add(Text("Claude Usage Tracker", 13.5, TextColor, FontWeights.Bold));
-        brand.Children.Add(Text(I18n.Tr("update.available"), 11, Ok));
+        brand.Children.Add(_history
+            ? Text(I18n.Tr("update.notes_title"), 11, Dim)
+            : Text(I18n.Tr("update.available"), 11, Ok));
         header.Children.Add(brand);
         stack.Children.Add(header);
 
-        var jump = Text($"{UpdateCheck.CurrentVersion} → {_latest}", 12, Dim);
-        jump.Margin = new Thickness(6, 12, 6, 0);
-        stack.Children.Add(jump);
+        if (!_history)
+        {
+            var jump = Text($"{UpdateCheck.CurrentVersion} → {_latest}", 12, Dim);
+            jump.Margin = new Thickness(6, 12, 6, 0);
+            stack.Children.Add(jump);
+        }
 
         if (_notes is not null)
         {
@@ -244,6 +274,7 @@ internal sealed class UpdateDialog : Window
         var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(Pad, 20, Pad, 8) };
         head.Children.Add(_title);
         head.Children.Add(_chip);
+        head.Children.Add(_installedChip);
         main.Children.Add(head);
 
         FrameworkElement body;
@@ -275,6 +306,15 @@ internal sealed class UpdateDialog : Window
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         foot.Children.Add(buttons);
+        if (_history)
+        {
+            // Read-only view: nothing to install or skip, whatever the build.
+            buttons.Children.Add(MakeButton(I18n.Tr("update.close"), primary: false, Close));
+            buttons.Children.Add(MakeButton(I18n.Tr("update.open_github"), primary: true, () => { OpenGithub(); Close(); }));
+            _ = versionFloor;
+            _ = onQuit;
+            return main;
+        }
         buttons.Children.Add(MakeButton(I18n.Tr("update.cancel"), primary: false, Close));
 #if INSTALLER_UPDATER
         // Installed build: verified download-and-install is the primary action.
@@ -476,6 +516,8 @@ internal sealed class UpdateDialog : Window
     internal int SelectedIndex => _selected;
     internal string TitleText => _title.Text;
     internal bool ChipVisible => _chip.Visibility == Visibility.Visible;
+    internal bool InstalledChipVisible => _installedChip.Visibility == Visibility.Visible;
+    internal string Url => _info.Url;
     internal string NotesText => string.Join("\n", Descendants(_notesPanel).OfType<TextBlock>()
         .Select(tb => string.Concat(tb.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text)) is { Length: > 0 } runs ? runs : tb.Text));
 
@@ -507,6 +549,8 @@ internal sealed class UpdateDialog : Window
         var version = _notes.Versions[index];
         _title.Text = I18n.Tr("update.notes_version", ("version", version.Version));
         _chip.Visibility = version.Version == _latest ? Visibility.Visible : Visibility.Collapsed;
+        _installedChip.Visibility = version.Version == UpdateCheck.CurrentVersion
+            ? Visibility.Visible : Visibility.Collapsed;
         PaintRows(hovered: null);
         Render(version);
     }

@@ -201,3 +201,89 @@ def test_window_is_resizable_with_a_floor(widget):
     assert d.win.resizable() == (True, True)
     min_w, min_h = d.win.minsize()
     assert min_w >= UD._MIN_WIDTH and min_h >= UD._MIN_HEIGHT
+
+
+# ── Release-notes view from the tray menu (R-life-8) ──────────────────────────
+
+def _buttons(win) -> list[str]:
+    found: list[str] = []
+    stack = list(win.winfo_children())
+    while stack:
+        node = stack.pop()
+        if isinstance(node, tk.Button):
+            found.append(str(node.cget("text")))
+        stack.extend(node.winfo_children())
+    return found
+
+
+def _history(root, current="9.1.0", releases=RELEASES):
+    from claude_usage_monitor.release_notes import select_history
+    notes = select_history(releases)
+    return UD.UpdateDialog(root, notes.versions[0].version, "https://github.com/x/releases",
+                           notes, current_version=current, history=True)
+
+
+def test_release_notes_view_selects_the_installed_version(widget):
+    _, root = widget
+    d = _history(root)
+    assert [r.cget("text") for r in d._rows] == ["9.2.0", "9.1.0", "9.0.0"]
+    assert d._selected == 1
+    assert d._title.cget("text") == "Version 9.1.0"
+    assert d._installed_chip.winfo_manager() == "pack"
+    assert d._chip.winfo_manager() == ""      # 9.1.0 is not the latest
+    d.select(0)
+    assert d._chip.winfo_manager() == "pack"
+    assert d._installed_chip.winfo_manager() == ""
+
+
+def test_release_notes_view_has_no_update_actions(widget):
+    _, root = widget
+    d = _history(root)
+    texts = _texts(d.win)
+    assert d.win.title() == "Release notes"
+    assert "Release notes" in texts and "Update available" not in texts
+    assert not any("→" in t for t in texts)
+    assert "Skip version" not in texts
+    assert sorted(_buttons(d.win)) == ["Close", "Open GitHub"]
+
+
+def test_release_notes_view_without_the_installed_version_starts_at_the_newest(widget):
+    _, root = widget
+    d = _history(root, current="0.1.0")
+    assert d._selected == 0
+    assert d._installed_chip.winfo_manager() == ""
+
+
+def test_widget_opens_one_release_notes_view_with_the_releases_page(widget, monkeypatch):
+    w, root = widget
+    from claude_usage_monitor.release_notes import select_history
+    opened: list[str] = []
+    monkeypatch.setattr(UD.webbrowser, "open", opened.append)
+    w._show_release_notes(select_history(RELEASES))
+    first = w._update_win
+    assert first is not None and first.title() == "Release notes"
+    w._show_release_notes(select_history(RELEASES))   # second click: no second window
+    assert w._update_win is first
+    dialogs = [c for c in root.winfo_children() if isinstance(c, tk.Toplevel)]
+    assert len(dialogs) == 1
+    d_open = [n for n in _all(first) if isinstance(n, tk.Button) and n.cget("text") == "Open GitHub"]
+    d_open[0].invoke()
+    assert opened == ["https://github.com/Liwindo/ClaudeUsageTracker/releases"]
+    assert w._update_win is None
+
+
+def test_widget_release_notes_unavailable_names_the_running_version(widget):
+    w, root = widget
+    from claude_usage_monitor import __version__
+    w._show_release_notes(None)
+    texts = _texts(w._update_win)
+    assert f"Version {__version__}" in texts
+    assert any(t.startswith("The release notes could not be loaded") for t in texts)
+
+
+def _all(win):
+    stack = list(win.winfo_children())
+    while stack:
+        node = stack.pop()
+        yield node
+        stack.extend(node.winfo_children())

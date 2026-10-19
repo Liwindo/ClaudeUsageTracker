@@ -1,5 +1,7 @@
 """The update dialog: the offered versions on the left, the selected version's
-release notes on the right (REQUIREMENTS.md R-life-6 / R-life-7).
+release notes on the right (REQUIREMENTS.md R-life-6 / R-life-7). With
+``history=True`` it is the tray menu's read-only "Release notes" view
+(R-life-8): every release, the installed one selected, no update actions.
 
 Layout and colours match UpdateDialog.cs. tkinter has no rounded corners, so
 rows and buttons are square here; everything else is the same. The window is
@@ -103,7 +105,9 @@ class UpdateDialog:
         on_skip: Optional[Callable[[], None]] = None,
         on_closed: Optional[Callable[[], None]] = None,
         current_version: Optional[str] = None,
+        history: bool = False,
     ) -> None:
+        self._history = history
         self._latest = latest_version
         self._url = url
         self._notes = notes
@@ -118,7 +122,7 @@ class UpdateDialog:
         win = tk.Toplevel(root)
         self.win = win
         win.withdraw()  # dark caption and size first, then show
-        win.title(tr("update.window_title"))
+        win.title(tr("update.notes_title" if history else "update.window_title"))
         win.configure(bg=W._BG)
         win.attributes("-topmost", True)
         self._set_icons()
@@ -134,7 +138,8 @@ class UpdateDialog:
         if notes is not None:
             win.bind("<Up>", lambda e: self.select(self._selected - 1))
             win.bind("<Down>", lambda e: self.select(self._selected + 1))
-            self.select(0)
+            installed = [v.version for v in notes.versions]
+            self.select(installed.index(self._current) if self._current in installed else 0)
         self._size_and_show()
 
     # ── Building ──────────────────────────────────────────────────────────────
@@ -165,10 +170,14 @@ class UpdateDialog:
         brand.pack(side="left", fill="y")
         tk.Label(brand, text="Claude Usage Tracker", font=_F_NAME, bg=bg,
                  fg=W._TEXT, anchor="w").pack(fill="x")
-        tk.Label(brand, text=tr("update.available"), font=_F_SMALL, bg=bg,
-                 fg=W._OK, anchor="w").pack(fill="x")
-        tk.Label(side, text=f"{self._current} → {self._latest}", font=_F_BODY,
-                 bg=bg, fg=W._DIM, anchor="w").pack(fill="x", padx=6, pady=(12, 0))
+        if self._history:
+            tk.Label(brand, text=tr("update.notes_title"), font=_F_SMALL, bg=bg,
+                     fg=W._DIM, anchor="w").pack(fill="x")
+        else:
+            tk.Label(brand, text=tr("update.available"), font=_F_SMALL, bg=bg,
+                     fg=W._OK, anchor="w").pack(fill="x")
+            tk.Label(side, text=f"{self._current} → {self._latest}", font=_F_BODY,
+                     bg=bg, fg=W._DIM, anchor="w").pack(fill="x", padx=6, pady=(12, 0))
 
         if self._notes is not None:
             tk.Label(side, text=tr("update.versions").upper(), font=_F_SMALL_BOLD,
@@ -215,6 +224,8 @@ class UpdateDialog:
         self._title.pack(side="left")
         self._chip = tk.Label(head, text=tr("update.latest"), font=_F_SMALL_BOLD,
                               bg=W._CHIP_BG, fg=W._OK, padx=6, pady=1)
+        self._installed_chip = tk.Label(head, text=tr("update.installed"), font=_F_SMALL_BOLD,
+                                        bg=W._BTN_BG, fg=W._DIM, padx=6, pady=1)
 
         if self._notes is not None:
             self._build_notes(main).grid(row=1, column=0, sticky="nsew", padx=(_PAD, 6))
@@ -230,7 +241,8 @@ class UpdateDialog:
         # side="right" packs right to left: the primary button ends up rightmost.
         self._button(foot, tr("update.open_github"), self._open_github, primary=True
                      ).pack(side="right")
-        self._button(foot, tr("update.cancel"), self.close).pack(side="right", padx=(0, 8))
+        self._button(foot, tr("update.close" if self._history else "update.cancel"),
+                     self.close).pack(side="right", padx=(0, 8))
         return main
 
     def _build_notes(self, parent: tk.Misc) -> tk.Frame:
@@ -320,10 +332,12 @@ class UpdateDialog:
         self._selected = index
         version = self._notes.versions[index]
         self._title.configure(text=tr("update.notes_version", version=version.version))
+        self._chip.pack_forget()
+        self._installed_chip.pack_forget()
         if version.version == self._latest:
             self._chip.pack(side="left", padx=(10, 0), pady=(4, 0))
-        else:
-            self._chip.pack_forget()
+        if version.version == self._current:
+            self._installed_chip.pack(side="left", padx=(10, 0), pady=(4, 0))
         for i in range(len(self._rows)):
             self._paint_row(i)
         self._render(version)

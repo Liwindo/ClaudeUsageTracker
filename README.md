@@ -34,13 +34,13 @@ Both variants use separate config folders, so they can run side by side while yo
 
 ## How it works (both variants)
 
-The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running. From the last 30 minutes of polls the widget also forecasts whether your session limit lasts until it resets. Once per start it asks the GitHub API whether a newer release exists and, if so, shows what changed since your version (disable with `update_check = false`).
+The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running. From the last 30 minutes of polls the widget also forecasts whether your session limit lasts until it resets. Once per start it asks the GitHub API whether a newer release exists and, if so, shows what changed since your version (disable with `update_check = false`). **Release notes** in the tray menu shows the notes of every version at any time.
 
 **Why Firefox only?** Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption — only the browser itself can decrypt them, and there is no user-space workaround. Firefox stores cookies unencrypted in SQLite, making it the only reliably supported browser.
 
 ## Privacy
 
-- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless disabled, a single anonymous version lookup to `api.github.com` per app start, plus, only when a newer version exists, one more to the same host for its release notes. No cookies or usage data ever leave your machine; no telemetry.
+- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless disabled, a single anonymous version lookup to `api.github.com` per app start, plus, only when a newer version exists, one more to the same host for its release notes. Choosing **Check for updates** or **Release notes** in the tray menu makes these requests on demand. No cookies or usage data ever leave your machine; no telemetry.
 - Cookies are read read-only from the Firefox database into memory for each poll and are never written to any other file.
 
 ## Repository layout

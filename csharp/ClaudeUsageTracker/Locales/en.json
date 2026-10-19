@@ -86,5 +86,8 @@
   "update.latest": "latest",
   "update.installed": "installed",
   "widget.forecast.lasts": "lasts until reset",
-  "widget.forecast.runs_out": "limit in {countdown}"
+  "widget.forecast.runs_out": "limit in {countdown}",
+  "tray.menu.release_notes": "Release notes",
+  "update.notes_title": "Release notes",
+  "update.close": "Close"
 }

@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import httpx
 
 from . import __version__
-from .release_notes import ReleaseNotes, select_notes
+from .release_notes import ReleaseNotes, select_history, select_notes
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ _RELEASES_API = f"https://api.github.com/repos/{_REPO}/releases/latest"
 # latest one. 30 entries cover far more than the MAX_RELEASES that are shown.
 _RELEASE_LIST_API = f"https://api.github.com/repos/{_REPO}/releases?per_page=30"
 REPO_RELEASES_URL = f"https://github.com/{_REPO}/releases/latest"
+# All releases: where "Open GitHub" leads from the release-notes view.
+REPO_RELEASES_LIST_URL = f"https://github.com/{_REPO}/releases"
 
 _TIMEOUT = httpx.Timeout(10.0)
 
@@ -157,6 +159,21 @@ def fetch_release_notes(
         logger.info("Release notes unavailable: %s", exc)
         return None
     notes = select_notes(payload, current_version, latest_version)
+    if notes is None:
+        logger.info("Release notes unavailable: no usable release body.")
+    return notes
+
+
+def fetch_release_history() -> ReleaseNotes | None:
+    """Every published release with its notes, newest first, for the tray
+    menu's "Release notes" (R-life-8). One request, made only when the user
+    asks. Never raises: None makes the dialog say the notes are unavailable."""
+    try:
+        payload = _get_json(_RELEASE_LIST_API)
+    except Exception as exc:
+        logger.info("Release notes unavailable: %s", exc)
+        return None
+    notes = select_history(payload)
     if notes is None:
         logger.info("Release notes unavailable: no usable release body.")
     return notes

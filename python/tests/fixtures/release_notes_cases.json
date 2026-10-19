@@ -783,6 +783,160 @@
    "expected_versions": null
   }
  ],
+ "history": [
+  {
+   "name": "every published release, newest first, also newer than the running one",
+   "releases": [
+    {
+     "tag_name": "v2.2.5",
+     "body": "- five"
+    },
+    {
+     "tag_name": "v2.3.0",
+     "body": "- three-oh"
+    },
+    {
+     "tag_name": "v2.2.4",
+     "body": "- draft",
+     "draft": true
+    },
+    {
+     "tag_name": "v2.2.3",
+     "body": "- pre",
+     "prerelease": true
+    },
+    {
+     "tag_name": "nightly",
+     "body": "- not a version"
+    },
+    {
+     "tag_name": "v2.2.2",
+     "body": null
+    },
+    {
+     "tag_name": "v2.2.1",
+     "body": "  \n"
+    },
+    {
+     "tag_name": "v1.0.0",
+     "body": "- first"
+    }
+   ],
+   "expected_versions": [
+    "2.3.0",
+    "2.2.5",
+    "1.0.0"
+   ],
+   "truncated": false
+  },
+  {
+   "name": "capped at ten, newest kept",
+   "releases": [
+    {
+     "tag_name": "v1.0.0",
+     "body": "- 0"
+    },
+    {
+     "tag_name": "v1.0.1",
+     "body": "- 1"
+    },
+    {
+     "tag_name": "v1.0.2",
+     "body": "- 2"
+    },
+    {
+     "tag_name": "v1.0.3",
+     "body": "- 3"
+    },
+    {
+     "tag_name": "v1.0.4",
+     "body": "- 4"
+    },
+    {
+     "tag_name": "v1.0.5",
+     "body": "- 5"
+    },
+    {
+     "tag_name": "v1.0.6",
+     "body": "- 6"
+    },
+    {
+     "tag_name": "v1.0.7",
+     "body": "- 7"
+    },
+    {
+     "tag_name": "v1.0.8",
+     "body": "- 8"
+    },
+    {
+     "tag_name": "v1.0.9",
+     "body": "- 9"
+    },
+    {
+     "tag_name": "v1.0.10",
+     "body": "- 10"
+    },
+    {
+     "tag_name": "v1.0.11",
+     "body": "- 11"
+    }
+   ],
+   "expected_versions": [
+    "1.0.11",
+    "1.0.10",
+    "1.0.9",
+    "1.0.8",
+    "1.0.7",
+    "1.0.6",
+    "1.0.5",
+    "1.0.4",
+    "1.0.3",
+    "1.0.2"
+   ],
+   "truncated": true
+  },
+  {
+   "name": "duplicates keep the first",
+   "releases": [
+    {
+     "tag_name": "v2.0.0",
+     "body": "- first"
+    },
+    {
+     "tag_name": "2.0",
+     "body": "- same version"
+    }
+   ],
+   "expected_versions": [
+    "2.0.0"
+   ],
+   "first_block": [
+    [
+     "first",
+     false
+    ]
+   ],
+   "truncated": false
+  },
+  {
+   "name": "nothing usable is none",
+   "releases": [
+    {
+     "tag_name": "v1.0.0",
+     "body": "",
+     "draft": false
+    }
+   ],
+   "expected_versions": null
+  },
+  {
+   "name": "not a list is none",
+   "releases": {
+    "message": "rate limited"
+   },
+   "expected_versions": null
+  }
+ ],
  "real": {
   "current": "0.0.1",
   "latest": "2.2.5",

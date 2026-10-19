@@ -37,9 +37,9 @@ ClaudeUsageTracker/        WPF app (net10.0-windows, UI entirely in code — no 
 ├─ Config.cs               TOML via Tomlyn, auto-migration of missing keys
 ├─ I18n.cs + Locales/*.json  9 languages (exported from python/, see scripts/)
 ├─ NotificationManager.cs  Thresholds + hysteresis + reset detection, live updates
-├─ UpdateCheck.cs          GitHub release check (once per start + manual)
+├─ UpdateCheck.cs          GitHub release check (once per start + manual), release history
 ├─ ReleaseNotes.cs         Release notes for the update dialog (untrusted Markdown → plain text)
-├─ UpdateDialog.cs         The update dialog (version list + notes, in-app install)
+├─ UpdateDialog.cs         The update dialog (version list + notes, in-app install; release-notes view)
 ├─ UpdateVerifier.cs       Pure trust gate: signature/digest/anti-rollback/host (shared w/ UpdateTool)
 ├─ UpdateManifest.cs       Strict parser for the signed update.json
 ├─ UpdateInstaller.cs      Verified download + visible installer + relaunch (installer build only)

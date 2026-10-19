@@ -39,6 +39,8 @@ public static partial class UpdateCheck
     // the latest one. 30 entries cover far more than the MaxReleases shown.
     private static readonly string ReleaseListApi = $"https://api.github.com/repos/{Repo}/releases?per_page=30";
     public static readonly string RepoReleasesUrl = $"https://github.com/{Repo}/releases/latest";
+    // All releases: where "Open GitHub" leads from the release-notes view.
+    public static readonly string RepoReleasesListUrl = $"https://github.com/{Repo}/releases";
 
     [GeneratedRegex(@"^v?(\d+(?:\.\d+)*)")]
     private static partial Regex VersionRegex();
@@ -160,6 +162,28 @@ public static partial class UpdateCheck
             return null;
         }
         var notes = ReleaseNotesParser.Select(payload, CurrentVersion, latestVersion);
+        if (notes is null)
+            Log.Info("update", "Release notes unavailable: no usable release body.");
+        return notes;
+    }
+
+    /// <summary>Every published release with its notes, newest first, for the
+    /// tray menu's "Release notes" (R-life-8). One request, made only when the
+    /// user asks. Never throws: null makes the dialog say the notes are
+    /// unavailable.</summary>
+    internal static ReleaseNotes? FetchReleaseHistory()
+    {
+        string payload;
+        try
+        {
+            payload = GetString(ReleaseListApi);
+        }
+        catch (Exception exc)
+        {
+            Log.Info("update", $"Release notes unavailable: {exc.Message}");
+            return null;
+        }
+        var notes = ReleaseNotesParser.SelectHistory(payload);
         if (notes is null)
             Log.Info("update", "Release notes unavailable: no usable release body.");
         return notes;

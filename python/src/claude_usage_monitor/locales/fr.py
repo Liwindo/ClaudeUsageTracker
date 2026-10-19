@@ -7,6 +7,7 @@ STRINGS: dict[str, str] = {
     "tray.menu.show_hide": "Afficher / masquer le widget",
     "tray.menu.refresh": "Actualiser maintenant",
     "tray.menu.check_updates": "Rechercher des mises à jour",
+    "tray.menu.release_notes": "Notes de version",
     "tray.menu.view_log": "Afficher le fichier journal",
     "tray.menu.open_appdata": "Ouvrir le dossier de données",
     "tray.menu.quit": "Quitter",
@@ -69,6 +70,8 @@ STRINGS: dict[str, str] = {
     "update.versions": "Versions",
     "update.latest": "dernière",
     "update.installed": "installée",
+    "update.notes_title": "Notes de version",
+    "update.close": "Fermer",
 
     # Startup dialogs
     "dialog.already_running.title": "Claude Usage Tracker",

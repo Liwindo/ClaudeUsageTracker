@@ -71,7 +71,7 @@ variant's head will be lost again.
 ## 3. Networking & resilience
 
 - **R-net-1** — The app talks only to: `claude.ai` (usage data),
-  `api.github.com` / `github.com` (update check + opening the release page), and
+  `api.github.com` / `github.com` (update check, release notes, opening the release page), and
   — only when the user starts an in-app update (§13) — the GitHub release asset
   hosts `github.com` / `*.githubusercontent.com` to download the signed manifest
   and installer. No other outbound requests. See also §10. *Origin: Privacy section.*
@@ -251,7 +251,8 @@ variant's head will be lost again.
   bodies** (`GET /releases?per_page=30` on `api.github.com`), never text bundled
   into the app, so an edited release text on GitHub is what users see. The request
   is made only when an update is available, on the update-check thread before the
-  dialog opens, for the startup and the manual check alike. The notes are
+  dialog opens, for the startup and the manual check alike (and on request from
+  the tray menu, R-life-8). The notes are
   best-effort: if they cannot be loaded, the dialog MUST still open and say so,
   and the update decision itself MUST NOT depend on them. The box grows with its
   content up to a fixed height and then scrolls. *Verified by:
@@ -276,6 +277,20 @@ variant's head will be lost again.
   differ: tkinter draws them square. *Verified by: `test_update_dialog.py` (Py) /
   `UpdateDialogTests` (C#); looks: screenshots of the real apps against the
   design canvas (GUI).*
+- **R-life-8** — Both variants MUST offer **"Release notes"** in the tray menu. It
+  opens the update dialog read-only at any time: every published release (same
+  rules and caps as R-life-6, without the version window), newest first, the
+  installed version selected and marked "installed" (the newest if it is not
+  among them), the newest marked "latest". It has no update actions: no version
+  jump, no Skip, no install, only "Close" and "Open GitHub", which opens the
+  app's fixed releases page. The notes are fetched live (`GET
+  /releases?per_page=30`) off the UI thread, only when the user chooses the entry,
+  independent of `update_check`; if they cannot be loaded the dialog says so.
+  Only one dialog at a time: an open update dialog is raised instead. *Verified
+  by: shared `history` cases in `release_notes_cases.json` (`test_release_notes.py`
+  / `ReleaseNotesTests`); `test_update_dialog.py` history tests /
+  `ReleaseNotesViewTests` (C#); real runs with live GitHub notes, screenshots of
+  both variants (GUI).*
 
 ## 10. Privacy & security
 

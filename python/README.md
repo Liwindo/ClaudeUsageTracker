@@ -27,7 +27,7 @@ Install [uv](https://docs.astral.sh/uv/), clone the repo, and run `build_exe.bat
 
 The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running.
 
-Once per app start it also asks the GitHub API whether a newer release exists; if so, a dialog lists every version since yours with its release notes (loaded live from GitHub) and offers to open the release page, skip that release permanently, or cancel (ask again next start). Disable with `update_check = false`. Only one instance can run at a time — starting the EXE again just shows a hint.
+Once per app start it also asks the GitHub API whether a newer release exists; if so, a dialog lists every version since yours with its release notes (loaded live from GitHub) and offers to open the release page, skip that release permanently, or cancel (ask again next start). Disable with `update_check = false`. **Release notes** in the tray menu opens the same dialog read-only at any time: every version with its notes, yours selected. Only one instance can run at a time — starting the EXE again just shows a hint.
 
 **Why Firefox only?** Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption — only the browser itself can decrypt them, and there is no user-space workaround. Firefox stores cookies unencrypted in SQLite, making it the only reliably supported browser.
 
@@ -49,7 +49,7 @@ The tray circle reflects your current **session (5-hour)** limit; the widget's p
 | 🔴 Red    | 85%+        |
 | ⚫ Grey   | No data / error |
 
-Left-click the tray icon to show or hide the widget; right-click for **Refresh now**, **View log file**, **Open app data folder**, and **Quit**.
+Left-click the tray icon to show or hide the widget; right-click for **Refresh now**, **Check for updates**, **Release notes**, **View log file**, **Open app data folder**, and **Quit**.
 
 The always-on-top widget shows **session %** with a forecast behind the label (*"· lasts until reset"*, or *"· limit in 1h 20m"* in orange when your pace of the last 30 minutes would use up the limit before the reset; nothing during the first 10 minutes of data), **weekly %**, and a **reset countdown** whose dot colour indicates how soon the session limit refreshes (🟢 < 15 min · 🟡 15–30 · 🟠 30–90 · 🔴 > 90). Hover to reveal refresh / minimise / quit buttons, drag anywhere to move, resize via the bottom-right grip — position, size, and minimised state are remembered between sessions. When a poll fails, the footer shows a short message (e.g. *"Session expired — open claude.ai in Firefox"*); hovering over it reveals the full error and the log file path.
 
@@ -130,7 +130,7 @@ CI runs the tests on every push and pull request. Releases are made by CI (the `
 
 ## Privacy
 
-- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless `update_check = false`, a single anonymous version lookup to `api.github.com` per app start, plus, only when a newer version exists, one more to the same host for its release notes. No cookies or usage data ever leave your machine; no telemetry.
+- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless `update_check = false`, a single anonymous version lookup to `api.github.com` per app start, plus, only when a newer version exists, one more to the same host for its release notes. Choosing **Check for updates** or **Release notes** in the tray menu makes these requests on demand. No cookies or usage data ever leave your machine; no telemetry.
 - Cookies are read read-only from the Firefox database into memory for each poll and are never written to any other file.
 
 ## Project structure
@@ -148,9 +148,9 @@ src/claude_usage_monitor/
 ├── tray.py              pystray icon + colour logic
 ├── widget.py            Persistent always-on-top tkinter widget
 ├── notifications.py     Desktop notification throttling
-├── update_check.py      One-shot GitHub release check at startup
+├── update_check.py      GitHub release check (startup + manual) and release history
 ├── release_notes.py     Release notes for the update dialog (untrusted Markdown → plain text)
-├── update_dialog.py     The update dialog (version list + notes)
+├── update_dialog.py     The update dialog (version list + notes; also the release-notes view)
 ├── autostart.py         HKCU Run-key sync for "start with Windows"
 ├── i18n.py              Translation lookup + Windows language detection
 ├── locales/             Translation catalogs (one file per language)
