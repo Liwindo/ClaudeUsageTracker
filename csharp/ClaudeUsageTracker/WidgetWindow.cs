@@ -190,6 +190,9 @@ public sealed class WidgetWindow : Window
     public void NotifyUpdate(UpdateInfo info, string versionFloor, Action? onSkip) =>
         Post(() => ShowUpdateDialog(info, versionFloor, onSkip));
 
+    /// <summary>Show the release-notes view of the update dialog. Thread-safe.</summary>
+    internal void ShowReleaseNotes(ReleaseNotes? notes) => Post(() => OpenReleaseNotes(notes));
+
     public void Shutdown() => Post(() =>
     {
         _peakTimer.Stop();
@@ -998,5 +1001,23 @@ public sealed class WidgetWindow : Window
         _updateWindow = dialog;
         dialog.Closed += (_, _) => _updateWindow = null;
         dialog.Show();
+    }
+
+    /// <summary>The tray menu's "Release notes" (R-life-8). One dialog at a
+    /// time: an open update dialog already lists the news, so it is raised.</summary>
+    internal UpdateDialog? OpenReleaseNotes(ReleaseNotes? notes)
+    {
+        if (_updateWindow is not null)
+        {
+            _updateWindow.Activate();
+            return null;
+        }
+        var newest = notes?.Versions[0].Version ?? UpdateCheck.CurrentVersion;
+        var info = new UpdateInfo(newest, UpdateCheck.RepoReleasesListUrl, [], notes);
+        var dialog = new UpdateDialog(info, "0.0.0", null, _onQuit, history: true);
+        _updateWindow = dialog;
+        dialog.Closed += (_, _) => _updateWindow = null;
+        dialog.Show();
+        return dialog;
     }
 }

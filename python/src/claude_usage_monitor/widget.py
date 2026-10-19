@@ -517,6 +517,10 @@ class Widget:
         """
         self._post(self._show_update_dialog, latest_version, url, on_skip, notes)
 
+    def show_release_notes(self, notes: Optional[ReleaseNotes]) -> None:
+        """Show the release-notes view of the update dialog. Thread-safe."""
+        self._post(self._show_release_notes, notes)
+
     def notify_message(self, title: str, body: str, kind: str = "info") -> None:
         """Show a simple modal info/warning box on the Tk thread. Thread-safe.
 
@@ -551,6 +555,30 @@ class Widget:
 
         dialog = UpdateDialog(
             self._root, latest_version, url, notes, on_skip=on_skip, on_closed=_closed
+        )
+        self._update_win = dialog.win
+
+    def _show_release_notes(self, notes: Optional[ReleaseNotes]) -> None:
+        if not self._root:
+            return
+        if self._update_win is not None:
+            # One dialog at a time; an open update dialog lists the news already.
+            try:
+                self._update_win.deiconify()
+                self._update_win.lift()
+            except tk.TclError:
+                pass
+            return
+        from .update_check import REPO_RELEASES_LIST_URL
+        from .update_dialog import UpdateDialog
+
+        def _closed() -> None:
+            self._update_win = None
+
+        newest = notes.versions[0].version if notes is not None else __version__
+        dialog = UpdateDialog(
+            self._root, newest, REPO_RELEASES_LIST_URL, notes,
+            on_closed=_closed, history=True,
         )
         self._update_win = dialog.win
 

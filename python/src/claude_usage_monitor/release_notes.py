@@ -20,6 +20,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from typing import Callable
 
 # At most this many versions are listed; older ones are summed up by a
 # "see GitHub" line. Generous for anyone who updates now and then, and it keeps
@@ -343,13 +344,24 @@ def select_notes(
     newer than the running version and not newer than the latest one, newest
     first. ``None`` when nothing usable is there, so the dialog can say the
     notes are unavailable instead of showing an empty box."""
-    if not isinstance(payload, list):
-        return None
     current = _version_key(current_version)
     latest = _version_key(latest_version)
     if current is None or latest is None:
         return None
+    return _select(payload, lambda key: current < key <= latest, max_releases)
 
+
+def select_history(payload: object, max_releases: int = MAX_RELEASES) -> ReleaseNotes | None:
+    """Every published release, newest first: the tray menu's "Release notes"
+    (R-life-8). Same rules as select_notes, without the version window."""
+    return _select(payload, lambda key: True, max_releases)
+
+
+def _select(
+    payload: object, wanted: Callable[[tuple[int, ...]], bool], max_releases: int,
+) -> ReleaseNotes | None:
+    if not isinstance(payload, list):
+        return None
     found: dict[tuple[int, ...], tuple[str, tuple[Block, ...]]] = {}
     for item in payload:
         if not isinstance(item, dict):
@@ -361,7 +373,7 @@ def select_notes(
         if not isinstance(tag, str) or not isinstance(body, str):
             continue
         key = _version_key(tag)
-        if key is None or key in found or not (current < key <= latest):
+        if key is None or key in found or not wanted(key):
             continue
         blocks = parse_body(body)
         if blocks:

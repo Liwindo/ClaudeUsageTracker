@@ -495,6 +495,21 @@ public static partial class ReleaseNotesParser
     public static ReleaseNotes? Select(string json, string currentVersion, string latestVersion,
         int maxReleases = MaxReleases)
     {
+        var current = VersionKey(currentVersion);
+        var latest = VersionKey(latestVersion);
+        if (current is null || latest is null)
+            return null;
+        return Select(json, key => CompareKeys(current, key) < 0 && CompareKeys(key, latest) <= 0, maxReleases);
+    }
+
+    /// <summary>Every published release, newest first: the tray menu's
+    /// "Release notes" (R-life-8). Same rules as <see cref="Select(string, string, string, int)"/>,
+    /// without the version window. Never throws.</summary>
+    public static ReleaseNotes? SelectHistory(string json, int maxReleases = MaxReleases) =>
+        Select(json, _ => true, maxReleases);
+
+    private static ReleaseNotes? Select(string json, Func<int[], bool> wanted, int maxReleases)
+    {
         JsonDocument doc;
         try
         {
@@ -505,17 +520,12 @@ public static partial class ReleaseNotesParser
             return null;
         }
         using (doc)
-            return Select(doc.RootElement, currentVersion, latestVersion, maxReleases);
+            return Select(doc.RootElement, wanted, maxReleases);
     }
 
-    private static ReleaseNotes? Select(JsonElement payload, string currentVersion, string latestVersion,
-        int maxReleases)
+    private static ReleaseNotes? Select(JsonElement payload, Func<int[], bool> wanted, int maxReleases)
     {
         if (payload.ValueKind is not JsonValueKind.Array)
-            return null;
-        var current = VersionKey(currentVersion);
-        var latest = VersionKey(latestVersion);
-        if (current is null || latest is null)
             return null;
 
         var found = new List<(int[] Key, string Version, IReadOnlyList<NoteBlock> Blocks)>();
@@ -532,8 +542,7 @@ public static partial class ReleaseNotesParser
                 continue;
             var tag = tagEl.GetString()!;
             var key = VersionKey(tag);
-            if (key is null || found.Any(f => CompareKeys(f.Key, key) == 0) ||
-                CompareKeys(current, key) >= 0 || CompareKeys(key, latest) > 0)
+            if (key is null || found.Any(f => CompareKeys(f.Key, key) == 0) || !wanted(key))
                 continue;
             var blocks = ParseBody(bodyEl.GetString()!);
             if (blocks.Count > 0)

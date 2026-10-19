@@ -64,6 +64,7 @@ class TrayIcon:
         on_click_open:  called when the user clicks the icon (open popup).
         on_click_refresh: called when the user chooses "Refresh now".
         on_check_updates: called when the user chooses "Check for updates".
+        on_release_notes: called when the user chooses "Release notes".
         on_quit: called when the user chooses "Quit".
     """
 
@@ -72,11 +73,13 @@ class TrayIcon:
         on_click_open: Callable[[], None],
         on_click_refresh: Callable[[], None],
         on_check_updates: Callable[[], None],
+        on_release_notes: Callable[[], None],
         on_quit: Callable[[], None],
     ) -> None:
         self._on_click_open = on_click_open
         self._on_click_refresh = on_click_refresh
         self._on_check_updates = on_check_updates
+        self._on_release_notes = on_release_notes
         self._on_quit = on_quit
         self._icon = self._build_icon()
 
@@ -90,6 +93,7 @@ class TrayIcon:
             pystray.MenuItem(tr("tray.menu.show_hide"), self._open, default=True),
             pystray.MenuItem(tr("tray.menu.refresh"), self._refresh),
             pystray.MenuItem(tr("tray.menu.check_updates"), self._check_updates),
+            pystray.MenuItem(tr("tray.menu.release_notes"), self._release_notes),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(tr("tray.menu.view_log"), self._view_log),
             pystray.MenuItem(tr("tray.menu.open_appdata"), self._open_appdata),
@@ -113,6 +117,9 @@ class TrayIcon:
 
     def _check_updates(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_check_updates()
+
+    def _release_notes(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+        self._on_release_notes()
 
     def _quit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
         self._on_quit()

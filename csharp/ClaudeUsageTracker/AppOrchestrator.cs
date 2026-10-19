@@ -34,6 +34,7 @@ public sealed class AppOrchestrator
             onClickRefresh: OnRefreshRequested,
             onSettings: ShowSettings,
             onCheckUpdates: CheckForUpdatesNow,
+            onReleaseNotes: ShowReleaseNotes,
             onQuit: Quit);
         _notifier = new NotificationManager(config.NotificationThresholds, _tray.ShowToast);
         _poller = new Poller(config, OnData, OnError);
@@ -105,6 +106,11 @@ public sealed class AppOrchestrator
         _settingsWindow.Show();
         _settingsWindow.Activate();
     });
+
+    /// <summary>Tray "Release notes": the notes of every release, read live from
+    /// GitHub off the UI thread, then the dialog in its read-only mode.</summary>
+    private void ShowReleaseNotes() =>
+        Task.Run(() => _widget.ShowReleaseNotes(UpdateCheck.FetchReleaseHistory()));
 
     /// <summary>Manual "check for updates now" from the settings dialog. Runs off
     /// the UI thread and reports all three outcomes distinctly — a newer release

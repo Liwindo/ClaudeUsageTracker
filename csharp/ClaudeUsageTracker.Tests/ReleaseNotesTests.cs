@@ -89,6 +89,27 @@ public class ReleaseNotesTests
             Assert.Equal(Normalize(first), Spans(notes.Versions[0].Blocks[0].Spans));
     }
 
+    public static IEnumerable<object[]> HistoryCases => Section("history");
+
+    [Theory]
+    [MemberData(nameof(HistoryCases))]
+    public void HistoryMatchesSharedCases(string name)
+    {
+        var c = Case("history", name);
+        var notes = ReleaseNotesParser.SelectHistory(c.GetProperty("releases").GetRawText());
+        var expected = c.GetProperty("expected_versions");
+        if (expected.ValueKind is JsonValueKind.Null)
+        {
+            Assert.Null(notes);
+            return;
+        }
+        Assert.NotNull(notes);
+        Assert.Equal(expected.EnumerateArray().Select(v => v.GetString()), notes.Versions.Select(v => v.Version));
+        Assert.Equal(c.GetProperty("truncated").GetBoolean(), notes.Truncated);
+        if (c.TryGetProperty("first_block", out var first))
+            Assert.Equal(Normalize(first), Spans(notes.Versions[0].Blocks[0].Spans));
+    }
+
     [Fact]
     public void RealReleasesParseExactlyLikeThePythonVariant()
     {

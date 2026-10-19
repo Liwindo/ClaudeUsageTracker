@@ -37,7 +37,7 @@ public sealed class TrayIcon : IDisposable
     private static extern bool DestroyIcon(IntPtr handle);
 
     public TrayIcon(Action onClickOpen, Action onClickRefresh, Action onSettings,
-        Action onCheckUpdates, Action onQuit)
+        Action onCheckUpdates, Action onReleaseNotes, Action onQuit)
     {
         var menu = new ContextMenuStrip();
         // Disabled header line — shows which version is running.
@@ -56,6 +56,9 @@ public sealed class TrayIcon : IDisposable
         var checkUpdates = new ToolStripMenuItem(I18n.Tr("tray.menu.check_updates"));
         checkUpdates.Click += (_, _) => onCheckUpdates();
         menu.Items.Add(checkUpdates);
+        var releaseNotes = new ToolStripMenuItem(I18n.Tr("tray.menu.release_notes"));
+        releaseNotes.Click += (_, _) => onReleaseNotes();
+        menu.Items.Add(releaseNotes);
         menu.Items.Add(new ToolStripSeparator());
         var viewLog = new ToolStripMenuItem(I18n.Tr("tray.menu.view_log"));
         viewLog.Click += (_, _) => ViewLog();
