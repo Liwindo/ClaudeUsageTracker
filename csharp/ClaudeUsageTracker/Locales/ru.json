@@ -41,8 +41,6 @@
   "widget.tooltip.log": "Журнал: {path}",
   "update.window_title": "Обновление",
   "update.available": "Доступно обновление",
-  "update.version_available": "Доступна версия {version}",
-  "update.running_version": "Установлена версия {version}.",
   "update.cancel": "Отмена",
   "update.skip": "Пропустить версию",
   "update.open_github": "Открыть GitHub",
@@ -80,5 +78,13 @@
   "settings.check_updates": "Проверить обновления сейчас",
   "update.up_to_date": "У вас последняя версия ({version}).",
   "update.check_failed": "Не удалось проверить обновления. Повторите попытку позже.",
-  "tray.menu.check_updates": "Проверить обновления"
+  "tray.menu.check_updates": "Проверить обновления",
+  "update.notes_version": "Версия {version}",
+  "update.notes_unavailable": "Не удалось загрузить описание выпуска. Оно доступно на странице выпуска на GitHub.",
+  "update.notes_more": "Более ранние изменения перечислены на GitHub.",
+  "update.versions": "Версии",
+  "update.latest": "последняя",
+  "update.installed": "установлена",
+  "widget.forecast.lasts": "хватит до сброса",
+  "widget.forecast.runs_out": "лимит через {countdown}"
 }

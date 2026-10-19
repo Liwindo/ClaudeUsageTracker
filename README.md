@@ -21,11 +21,11 @@ The tracker ships in two variants that monitor the same claude.ai limits and rea
 
 | I want to… | Download |
 |------------|----------|
-| just install it and go | **`ClaudeUsageTracker-Setup-X.Y.Z.exe`** (C#, ~4 MB) — **recommended**. Per-user install (no admin rights), Start-menu entry, optional autostart, uninstaller. Downloads the .NET runtime automatically if it is missing. |
+| just install it and go | **`ClaudeUsageTracker-Setup-X.Y.Z.exe`** (C#, ~4 MB) — **recommended**. Per-user install (no admin rights), Start-menu entry, optional autostart, uninstaller, one-click signature-verified updates. If the .NET Desktop Runtime is missing, it opens Microsoft's official download for you. |
 | nothing installed, a single EXE | `ClaudeUsageTracker-Portable-X.Y.Z.exe` (C#, ~80 MB) — no installation, no dependencies; runs from anywhere, USB stick included. |
 | keep using the classic Python build | `ClaudeUsageTracker.exe` (Python, ~12 MB) — the proven original, portable as always. |
 
-The **C# variant** (new) additionally offers a settings dialog (no more hand-editing the config file), clickable notifications, an instant re-poll after standby/network changes, and a smaller memory footprint. The **Python variant** is the battle-tested base the project started with — it keeps working exactly as before.
+The **C# variant** (new) additionally offers a settings dialog (no more hand-editing the config file), one-click verified updates (installer version), clickable notifications, an instant re-poll after standby/network changes, and a smaller memory footprint. The **Python variant** is the battle-tested base the project started with — it keeps working exactly as before.
 
 Both variants use separate config folders, so they can run side by side while you compare (that doubles the requests to claude.ai — harmless, but pick one for daily use). Settings use the same TOML format in both; to migrate, copy your values over once — or just set them again in the C# settings dialog.
 
@@ -34,13 +34,13 @@ Both variants use separate config folders, so they can run side by side while yo
 
 ## How it works (both variants)
 
-The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running. Once per start it asks the GitHub API whether a newer release exists (disable with `update_check = false`).
+The tool reads your existing claude.ai session cookies directly from Firefox's cookie database — read-only, no file copy, **no passwords, no manual exports, no stored credentials** — and polls claude.ai's internal `/usage` endpoint every 30 seconds (configurable). Firefox does not need to be open while the tool is running. From the last 30 minutes of polls the widget also forecasts whether your session limit lasts until it resets. Once per start it asks the GitHub API whether a newer release exists and, if so, shows what changed since your version (disable with `update_check = false`).
 
 **Why Firefox only?** Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption — only the browser itself can decrypt them, and there is no user-space workaround. Firefox stores cookies unencrypted in SQLite, making it the only reliably supported browser.
 
 ## Privacy
 
-- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless disabled, a single anonymous version lookup to `api.github.com` per app start. No cookies or usage data ever leave your machine; no telemetry.
+- Outbound traffic is limited to HTTPS requests to `claude.ai` (the same ones your browser already makes) and, unless disabled, a single anonymous version lookup to `api.github.com` per app start, plus, only when a newer version exists, one more to the same host for its release notes. No cookies or usage data ever leave your machine; no telemetry.
 - Cookies are read read-only from the Firefox database into memory for each poll and are never written to any other file.
 
 ## Repository layout
@@ -48,10 +48,9 @@ The tool reads your existing claude.ai session cookies directly from Firefox's c
 ```
 python/    the Python variant (source, tests, PyInstaller build)
 csharp/    the C# variant (source, tests, installer, release build)
-scripts/   shared tooling: locale export/check, lockstep version bump,
-           changelog guard, dependency validation, update-key setup and
-           release signing, shipped-dependency report for the dependency graph
-.github/   CI, release and supply-chain workflows, Dependabot config
+scripts/   shared tooling: locale sync, version bump, release signing, checks (scripts/README.md)
+.github/   CI, release and supply-chain workflows (.github/workflows/README.md), Dependabot config
+.claude/   Claude Code project settings: the commit hook that requires a doc review
 docs/      screenshots
 ```
 

@@ -1,13 +1,14 @@
 name: CI (C#)
 
 # Path-filtered to the C# variant plus the shared locale source-of-truth
-# check. python/-only changes run ci.yml instead.
+# check, the docs check and the release-notes cases both suites run.
+# python/-only changes run ci.yml instead.
 on:
   push:
     branches: [master]
-    paths: ['csharp/**', 'scripts/export_locales.py', '.github/workflows/ci-csharp.yml']
+    paths: ['csharp/**', 'scripts/export_locales.py', 'scripts/check_docs.py', 'python/tests/fixtures/**', '.github/workflows/ci-csharp.yml']
   pull_request:
-    paths: ['csharp/**', 'scripts/export_locales.py', '.github/workflows/ci-csharp.yml']
+    paths: ['csharp/**', 'scripts/export_locales.py', 'scripts/check_docs.py', 'python/tests/fixtures/**', '.github/workflows/ci-csharp.yml']
 
 permissions:
   contents: read
@@ -33,6 +34,11 @@ jobs:
       # stdlib-only script, the runner's default Python is fine here.
       - name: Verify C# locale catalogs match the Python source
         run: python scripts/export_locales.py --check
+
+      # A new C# file or asset must be named in csharp/README.md (R-rel-7);
+      # a csharp/-only change never runs ci.yml, so the check runs here too.
+      - name: Check the docs cover the repo
+        run: python scripts/check_docs.py
 
   # Auto-merge Dependabot nuget PRs once the test job passes — mirrors the
   # automerge job in ci.yml so csharp/ bumps get the same treatment as

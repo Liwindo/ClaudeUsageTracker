@@ -32,6 +32,16 @@ _CODENAME_LABELS: dict[str, str] = {
 }
 
 
+def format_countdown(seconds: float) -> str:
+    """Duration as hours + minutes, e.g. '3h 42m'; below an hour '42m'."""
+    secs = max(0, int(seconds))
+    h, remainder = divmod(secs, 3600)
+    m = remainder // 60
+    if h:
+        return tr("countdown.hours_minutes", hours=h, minutes=m)
+    return tr("countdown.minutes", minutes=m)
+
+
 @dataclass
 class LimitInfo:
     """One usage bucket (e.g. five_hour, seven_day_omelette)."""
@@ -50,16 +60,9 @@ class LimitInfo:
     @property
     def reset_countdown(self) -> str:
         """Human-readable countdown string, e.g. '3h 42m'."""
-        secs = int(self.resets_in_seconds)
-        if secs <= 0:
-            # An expired window is a caller-level state (the widget shows
-            # "waiting for first message"); the countdown stays a duration.
-            return tr("countdown.minutes", minutes=0)
-        h, remainder = divmod(secs, 3600)
-        m = remainder // 60
-        if h:
-            return tr("countdown.hours_minutes", hours=h, minutes=m)
-        return tr("countdown.minutes", minutes=m)
+        # An expired window is a caller-level state (the widget shows
+        # "waiting for first message"); the countdown stays a duration.
+        return format_countdown(self.resets_in_seconds)
 
     @classmethod
     def _parse_utilization(cls, raw: Any) -> int:

@@ -38,6 +38,8 @@ STRINGS: dict[str, str] = {
     # Widget
     "widget.metric.session": "Sessie",
     "widget.metric.weekly": "Week",
+    "widget.forecast.lasts": "genoeg tot reset",
+    "widget.forecast.runs_out": "limiet over {countdown}",
     "widget.status.connecting": "verbinden…",
     "widget.status.active": "actief",
     "widget.status.reset_in": "reset over {countdown}",
@@ -56,13 +58,17 @@ STRINGS: dict[str, str] = {
     # Update dialog
     "update.window_title": "Update",
     "update.available": "Update beschikbaar",
-    "update.version_available": "Versie {version} is beschikbaar",
-    "update.running_version": "Je gebruikt versie {version}.",
     "update.cancel": "Annuleren",
     "update.skip": "Versie overslaan",
     "update.open_github": "GitHub openen",
     "update.up_to_date": "Je gebruikt de nieuwste versie ({version}).",
     "update.check_failed": "Kan niet op updates controleren. Probeer het later opnieuw.",
+    "update.notes_version": "Versie {version}",
+    "update.notes_unavailable": "De release-opmerkingen konden niet worden geladen. Ze staan op de releasepagina op GitHub.",
+    "update.notes_more": "Oudere wijzigingen staan op GitHub.",
+    "update.versions": "Versies",
+    "update.latest": "nieuwste",
+    "update.installed": "geïnstalleerd",
 
     # Startup dialogs
     "dialog.already_running.title": "Claude Usage Tracker",

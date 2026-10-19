@@ -1,0 +1,2357 @@
+{
+ "_comment": "Shared contract for the release-notes parser (REQUIREMENTS.md R-life-6 / R-net-8). Python (tests/test_release_notes.py) and C# (ClaudeUsageTracker.Tests/ReleaseNotesTests.cs, which links this file) both run every case, so the two variants cannot drift. Spans are [text, bold]. 'real' holds a trimmed copy of the actual GitHub releases and the expected parse of them.",
+ "sanitize": [
+  {
+   "name": "bom and line endings",
+   "input": "﻿a\r\nb\rc",
+   "expected": "a\nb\nc"
+  },
+  {
+   "name": "zwj kept for emoji sequences",
+   "input": "x‍y",
+   "expected": "x‍y"
+  },
+  {
+   "name": "bidi controls dropped",
+   "input": "bi‮di⁦x⁩",
+   "expected": "bidix"
+  },
+  {
+   "name": "tab becomes space",
+   "input": "tab\there",
+   "expected": "tab here"
+  },
+  {
+   "name": "c0 and c1 controls dropped",
+   "input": "nul\u0000xyz",
+   "expected": "nulxyz"
+  },
+  {
+   "name": "soft hyphen and line separator dropped",
+   "input": "soft­hy phen",
+   "expected": "softhyphen"
+  },
+  {
+   "name": "emoji, variation selector and umlauts untouched",
+   "input": "⚠️ 🔒 äöü ß",
+   "expected": "⚠️ 🔒 äöü ß"
+  }
+ ],
+ "inline": [
+  {
+   "name": "plain",
+   "input": "Hello world",
+   "expected": [
+    [
+     "Hello world",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "bold",
+   "input": "a **b** c",
+   "expected": [
+    [
+     "a ",
+     false
+    ],
+    [
+     "b",
+     true
+    ],
+    [
+     " c",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "bold underscores",
+   "input": "__b__ x",
+   "expected": [
+    [
+     "b",
+     true
+    ],
+    [
+     " x",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "emphasis star loses markers",
+   "input": "said nothing about *why*.",
+   "expected": [
+    [
+     "said nothing about why.",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "emphasis underscore loses markers",
+   "input": "_note_ here",
+   "expected": [
+    [
+     "note here",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "snake_case stays",
+   "input": "use snake_case_name now",
+   "expected": [
+    [
+     "use snake_case_name now",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "arithmetic stays",
+   "input": "5*3*2 = 30",
+   "expected": [
+    [
+     "5*3*2 = 30",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "intraword star emphasis stays",
+   "input": "un*frigging*believable",
+   "expected": [
+    [
+     "un*frigging*believable",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "intraword underscore bold stays",
+   "input": "foo__bar__baz",
+   "expected": [
+    [
+     "foo__bar__baz",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "bold may end inside a word",
+   "input": "**bold**ly",
+   "expected": [
+    [
+     "bold",
+     true
+    ],
+    [
+     "ly",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "bold and emphasis",
+   "input": "***x***",
+   "expected": [
+    [
+     "x",
+     true
+    ]
+   ]
+  },
+  {
+   "name": "code keeps markers literal",
+   "input": "`*.githubusercontent.com` and `**x**`",
+   "expected": [
+    [
+     "*.githubusercontent.com and **x**",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "code inside bold",
+   "input": "**Use `x` now**",
+   "expected": [
+    [
+     "Use x now",
+     true
+    ]
+   ]
+  },
+  {
+   "name": "double backtick code",
+   "input": "``a`b``",
+   "expected": [
+    [
+     "a`b",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "code padding stripped once",
+   "input": "`` `x` ``",
+   "expected": [
+    [
+     "`x`",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "unclosed backtick stays",
+   "input": "it`s",
+   "expected": [
+    [
+     "it`s",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "link keeps only its text",
+   "input": "see [Microsoft's page](https://dotnet.microsoft.com/download) now",
+   "expected": [
+    [
+     "see Microsoft's page now",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "link with title",
+   "input": "[a](https://x.y \"t\")",
+   "expected": [
+    [
+     "a",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "bold link",
+   "input": "**[Docs](https://x.y)**",
+   "expected": [
+    [
+     "Docs",
+     true
+    ]
+   ]
+  },
+  {
+   "name": "image keeps alt text",
+   "input": "![logo](a.png) x",
+   "expected": [
+    [
+     "logo x",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "autolink keeps url text",
+   "input": "<https://github.com/x>",
+   "expected": [
+    [
+     "https://github.com/x",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "brackets without url stay",
+   "input": "[not a link] (x)",
+   "expected": [
+    [
+     "[not a link] (x)",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "escapes",
+   "input": "\\*not em\\* and \\[x\\]",
+   "expected": [
+    [
+     "*not em* and [x]",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "unmatched bold stays",
+   "input": "a **b",
+   "expected": [
+    [
+     "a **b",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "spaced markers stay",
+   "input": "a ** b ** c",
+   "expected": [
+    [
+     "a ** b ** c",
+     false
+    ]
+   ]
+  },
+  {
+   "name": "emoji and umlauts",
+   "input": "🔒 **Größe** ändert ⚠️ 👨‍👩‍👧",
+   "expected": [
+    [
+     "🔒 ",
+     false
+    ],
+    [
+     "Größe",
+     true
+    ],
+    [
+     " ändert ⚠️ 👨‍👩‍👧",
+     false
+    ]
+   ]
+  }
+ ],
+ "blocks": [
+  {
+   "name": "heading and bullets with crlf",
+   "input": "### 🔒 Security\r\n\r\n- **One.** first\r\n- Two\r\n",
+   "expected": [
+    {
+     "kind": "heading",
+     "level": 0,
+     "spans": [
+      [
+       "🔒 Security",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "One.",
+       true
+      ],
+      [
+       " first",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "Two",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "paragraph lines are joined",
+   "input": "A maintenance release:\nno new features.",
+   "expected": [
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "A maintenance release: no new features.",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "bullet continuation",
+   "input": "- first line\n  continued here\n- second",
+   "expected": [
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "first line continued here",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "second",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "nested bullets",
+   "input": "- parent:\n  - `child-1.exe` — one\n  - child 2",
+   "expected": [
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "parent:",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "bullet",
+     "level": 1,
+     "spans": [
+      [
+       "child-1.exe — one",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "bullet",
+     "level": 1,
+     "spans": [
+      [
+       "child 2",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "full changelog line dropped",
+   "input": "- x\n\n**Full Changelog**: https://github.com/a/b/compare/v1...v2",
+   "expected": [
+    {
+     "kind": "bullet",
+     "level": 0,
+     "spans": [
+      [
+       "x",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "closing hashes and rule",
+   "input": "## Title ##\n---\ntext",
+   "expected": [
+    {
+     "kind": "heading",
+     "level": 0,
+     "spans": [
+      [
+       "Title",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "text",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "bold heading",
+   "input": "### **Bold** heading",
+   "expected": [
+    {
+     "kind": "heading",
+     "level": 0,
+     "spans": [
+      [
+       "Bold",
+       true
+      ],
+      [
+       " heading",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "code fence lines dropped",
+   "input": "```\ncode line\n```",
+   "expected": [
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "code line",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "numbered items stay separate",
+   "input": "1. first\n2. second",
+   "expected": [
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "1. first",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "2. second",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "quote becomes its own paragraph",
+   "input": "text\n> **Note:** quoted\n> more\nafter",
+   "expected": [
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "text",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "Note:",
+       true
+      ],
+      [
+       " quoted more",
+       false
+      ]
+     ]
+    },
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "after",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "control characters removed",
+   "input": "a\u0007b\tc‮d",
+   "expected": [
+    {
+     "kind": "text",
+     "level": 0,
+     "spans": [
+      [
+       "ab cd",
+       false
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "only bom and blanks",
+   "input": "﻿\n\n   \n",
+   "expected": []
+  }
+ ],
+ "select": [
+  {
+   "name": "versions between running and latest, newest first",
+   "current": "2.2.3",
+   "latest": "2.2.5",
+   "releases": [
+    {
+     "tag_name": "v2.2.5",
+     "body": "- five"
+    },
+    {
+     "tag_name": "v2.2.4",
+     "body": "- four"
+    },
+    {
+     "tag_name": "v2.2.3",
+     "body": "- three"
+    },
+    {
+     "tag_name": "v2.2.2",
+     "body": "- two"
+    }
+   ],
+   "expected_versions": [
+    "2.2.5",
+    "2.2.4"
+   ],
+   "truncated": false
+  },
+  {
+   "name": "sorted by version, duplicates keep the first",
+   "current": "2.2.3",
+   "latest": "2.2.5",
+   "releases": [
+    {
+     "tag_name": "v2.2.4",
+     "body": "- four"
+    },
+    {
+     "tag_name": "2.2.5",
+     "body": "- five"
+    },
+    {
+     "tag_name": "v2.2.5",
+     "body": "- duplicate"
+    }
+   ],
+   "expected_versions": [
+    "2.2.5",
+    "2.2.4"
+   ],
+   "first_block": [
+    [
+     "five",
+     false
+    ]
+   ],
+   "truncated": false
+  },
+  {
+   "name": "drafts, pre-releases and junk skipped",
+   "current": "2.2.0",
+   "latest": "2.2.5",
+   "releases": [
+    {
+     "tag_name": "v9.0.0",
+     "body": "- newer than latest"
+    },
+    {
+     "tag_name": "v2.2.5",
+     "body": "- ok"
+    },
+    {
+     "tag_name": "v2.2.4",
+     "body": "- draft",
+     "draft": true
+    },
+    {
+     "tag_name": "v2.2.3",
+     "body": "- pre",
+     "prerelease": true
+    },
+    {
+     "tag_name": "v2.2.2",
+     "body": null
+    },
+    {
+     "tag_name": "v2.2.1",
+     "body": "  \n"
+    },
+    {
+     "tag_name": "nightly",
+     "body": "- garbage tag"
+    },
+    {
+     "tag_name": 7,
+     "body": "- numeric tag"
+    },
+    "not an object"
+   ],
+   "expected_versions": [
+    "2.2.5"
+   ],
+   "truncated": false
+  },
+  {
+   "name": "capped at max_releases",
+   "current": "1.0.0",
+   "latest": "1.4.0",
+   "max_releases": 2,
+   "releases": [
+    {
+     "tag_name": "v1.1.0",
+     "body": "- a"
+    },
+    {
+     "tag_name": "v1.4.0",
+     "body": "- d"
+    },
+    {
+     "tag_name": "v1.2.0",
+     "body": "- b"
+    },
+    {
+     "tag_name": "v1.3.0",
+     "body": "- c"
+    }
+   ],
+   "expected_versions": [
+    "1.4.0",
+    "1.3.0"
+   ],
+   "truncated": true
+  },
+  {
+   "name": "trailing zeros compare equal",
+   "current": "2.2",
+   "latest": "2.2.5",
+   "releases": [
+    {
+     "tag_name": "v2.2.0",
+     "body": "- same as running"
+    },
+    {
+     "tag_name": "v2.2.1",
+     "body": "- one"
+    }
+   ],
+   "expected_versions": [
+    "2.2.1"
+   ],
+   "truncated": false
+  },
+  {
+   "name": "payload that is not a list",
+   "current": "1.0.0",
+   "latest": "2.0.0",
+   "releases": {
+    "message": "API rate limit exceeded"
+   },
+   "expected_versions": null
+  },
+  {
+   "name": "nothing qualifies",
+   "current": "2.2.5",
+   "latest": "2.2.5",
+   "releases": [
+    {
+     "tag_name": "v2.2.5",
+     "body": "- five"
+    }
+   ],
+   "expected_versions": null
+  }
+ ],
+ "real": {
+  "current": "0.0.1",
+  "latest": "2.2.5",
+  "releases": [
+   {
+    "tag_name": "v2.2.5",
+    "draft": false,
+    "prerelease": false,
+    "body": "A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.\r\n\r\n### 🔒 Security / hardening\r\n\r\n- **The portable C# version now ships the current .NET runtime (10.0.13).** The portable EXE carries its own copy of .NET and WPF. 2.2.4 included version 10.0.10, which is affected by 23 published Microsoft security advisories. Each was checked against what the app does, and no way was found to trigger any of them through it: the app opens no documents, XAML, XPS or font files, prints nothing, uses no XML and loads only its own built-in images. The bundled copy is updated anyway, so its safety no longer rests on that analysis. The installer version uses the .NET Desktop Runtime installed on your PC instead; keep that up to date through Windows Update or [Microsoft's download page](https://dotnet.microsoft.com/download/dotnet/10.0).\r\n- **The Python version is now built with Python 3.14.8 (was 3.14.4).** Its upstream releases include security fixes, among others in the `ssl` and `urllib` modules, in `tarfile`/`zipfile` and in the bundled XML parser. Before the switch, a real request confirmed that claude.ai still accepts connections made with the new version. This matters because an earlier change of the build Python caused constant \"Session expired\" errors (see 1.5.1).\r\n- **Updated bundled libraries.** C# version: Microsoft.Data.Sqlite and System.Net.Http.WinHttpHandler 10.0.12, SQLitePCLRaw 3.0.5. Python version: anyio 4.14.2 (contains a security fix), tzdata 2026.5, and the PyInstaller build tool 6.22.3.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.2.4...v2.2.5\r\n"
+   },
+   {
+    "tag_name": "v2.2.4",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🔒 Security / hardening\r\n\r\n- **The update dialog's \"Open GitHub\" button now only ever opens a real github.com page.** The release page address was taken from GitHub's API response and opened as-is. In the app's threat model — where even a fully compromised GitHub account must not be able to harm you — that value is untrusted, and the \"open\" action can do more than open a web page (a local path or `file://`/network value could launch a program). Both variants now verify the address is an `https://github.com/…` URL before opening it and otherwise fall back to the app's own fixed releases page. The cryptographically verified \"Download & install\" path was never affected.\r\n- **The C# installer no longer downloads and silently runs the .NET runtime for you** when it's missing. It now opens Microsoft's official, direct runtime download in your browser so you install it yourself — which means Windows checks the installer's Microsoft signature and shows \"Microsoft Corporation\" as the verified publisher, instead of the setup fetching an executable and running it with admin rights unverified. The link goes straight to the correct download, so there's nothing to hunt for.\r\n\r\n### 🐛 Bug fixes\r\n\r\n- **Your settings file can no longer be corrupted by a crash or power cut while it is being saved.** The config is now written to a temporary file and swapped into place in a single atomic step, so an interrupted save leaves either your previous settings or the complete new ones — never a half-written `config.toml` that the app would refuse to start from.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.2.3...v2.2.4\r\n"
+   },
+   {
+    "tag_name": "v2.2.3",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🔧 Changed\r\n\r\n- **Network errors in the C# log now name the actual cause.** A failed poll used to log only .NET's generic \"An error occurred while sending the request.\", which said nothing about *why*. The log line now carries the innermost cause plus the WinHTTP error code — name not resolved, TLS/security channel, cannot connect, timeout — so a recurring problem can be told apart from a passing blip without guesswork.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.2.2...v2.2.3\r\n"
+   },
+   {
+    "tag_name": "v2.2.2",
+    "draft": false,
+    "prerelease": false,
+    "body": "\n### 🔧 Changed\n\n- **C# in-app update now runs the normal, visible installer** instead of a silent background install. When you choose \"Download & install\", the verified installer opens as an ordinary setup wizard (the same one you'd get by downloading it yourself) and relaunches the app when it finishes. This removes an install technique — a hidden helper silently running a freshly-downloaded file out of the temp folder — that some antivirus tools (e.g. Bitdefender) flagged as suspicious behaviour, even though the download is cryptographically verified before anything runs. The signature/hash/anti-rollback checks are unchanged; only the final launch is now indistinguishable from a normal install. The staged installer is kept under the app's own `%LOCALAPPDATA%` folder rather than `%TEMP%`, and is deleted automatically once the updated app relaunches.\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.2.1...v2.2.2\n"
+   },
+   {
+    "tag_name": "v2.2.1",
+    "draft": false,
+    "prerelease": false,
+    "body": "\n### 🔒 Security / hardening\n\n- **Update anti-rollback is now durable across restarts (C# installer).** The updater already refused any release that wasn't strictly newer than the running version; it now also remembers the highest version this install has ever run (`update_version_floor`) and refuses anything at or below it. This closes a narrow downgrade path: even a validly-signed *older* release (e.g. served by a compromised GitHub account) can no longer be installed over a build that once ran something newer.\n- **Release-integrity workflow no longer inlines the release tag into its script.** The published tag is now passed to the verification step as an environment value instead of being expanded into the PowerShell body, removing an expression-injection foothold (only exploitable by someone who could already publish releases, but eliminated regardless).\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.2.0...v2.2.1\n"
+   },
+   {
+    "tag_name": "v2.2.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "### ✨ New features\r\n\r\n- **Check for updates on demand.** Both variants now have a **Check for updates** entry in the tray menu (and the C# settings dialog has a button), so you no longer have to restart to look for a new version. It clearly tells you whether an update is available, you are up to date, or the check couldn't reach GitHub — and it surfaces a release even if you previously chose \"Skip version\".\r\n- **C# installer: one-click, cryptographically verified updates.** The installed C# build can now download and install a newer release for you (**Download & install** in the update dialog) instead of only opening the GitHub page. Security was the priority: the app installs an update **only** if a signature made with an offline key — one that never exists on GitHub or in CI — verifies against a public key built into the app, the download's SHA-256 matches that signed manifest, and the version is strictly newer. Anything else is refused and nothing is run. The portable EXE and the Python variant keep opening the GitHub page (a single-file EXE can't safely replace itself).\r\n\r\n### 🐛 Bug fixes\r\n\r\n- **C# variant: the widget no longer jumps when Anthropic's peak-hour banner appears or disappears.** Its bottom edge is now anchored, so the extra banner height grows the window upward and the resting position stays put across every peak/non-peak transition — matching the Python variant (which fixed the same issue in 1.4.1). The saved position is stored as a height-invariant bottom anchor, so restarting during peak hours can no longer drift the widget.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.1.1...v2.2.0\r\n"
+   },
+   {
+    "tag_name": "v2.1.1",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🐛 Bug fixes\r\n\r\n- **The tray tooltip no longer shows a bogus third \"Unknown (spend)\" entry behind the session and weekly values.** claude.ai's usage response recently gained a `spend` object (credit-balance metadata, not a usage limit); both variants mistook every non-`extra_usage` object for a usage bucket and rendered it with the generic \"Unknown (…)\" label. A response object is now only treated as a bucket when it carries a real utilization value, so genuinely new limit buckets still appear while metadata like `spend` is ignored.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v2.1.0...v2.1.1\r\n"
+   },
+   {
+    "tag_name": "v2.1.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "The tracker now ships in **two variants** in every release — pick one on the [\"Which version is for me?\"](https://github.com/Liwindo/ClaudeUsageTracker#which-version-is-for-me) table. Both monitor the same claude.ai limits and read the same Firefox cookies; they share one version number from now on (which is why the Python variant jumps from 1.5.2 straight to 2.1.0).\r\n\r\n### ✨ C# variant (new)\r\n\r\n- First release of the C#/.NET 10 port, available two ways:\r\n  - `ClaudeUsageTracker-Setup-2.1.0.exe` — per-user installer (no admin rights): Start-menu entry, optional autostart, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link.\r\n  - `ClaudeUsageTracker-Portable-2.1.0.exe` — everything in a single EXE, no installation, no dependencies.\r\n- What it adds over the Python variant: a **settings dialog** (no more hand-editing config.toml), **clickable notifications** (click → claude.ai, missed ones land in the Action Center), an **instant re-poll** after standby resume or network return (offline it doesn't poll at all), efficiency mode (EcoQoS), per-monitor DPI sharpness, edge snapping, animated bars — and a smaller memory footprint.\r\n- Runs side by side with the Python variant: own config folder (`%APPDATA%\\claude-usage-tracker-cs`), own autostart entry, own process name.\r\n\r\n### 🐍 Python variant\r\n\r\n- No functional changes — `ClaudeUsageTracker.exe` keeps working exactly as in 1.5.2; the version only moves in lockstep with the new C# variant.\r\n\r\n### 📦 Both\r\n\r\n- Releases now include a `SHA256SUMS.txt` with checksums of all three EXEs.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.5.2...v2.1.0\r\n"
+   },
+   {
+    "tag_name": "v1.5.2",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🐛 Bug fixes\r\n\r\n- When the 5-hour session window has ended and the next one hasn't started yet, the widget footer now says \"Waiting for first message\" (translated into all 9 languages) instead of the garbled \"reset resetting…\". A new session only begins with your first message, so there is no countdown to show in that state.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.5.1...v1.5.2\r\n"
+   },
+   {
+    "tag_name": "v1.5.1",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🐛 Bug fixes\r\n\r\n- **The released EXE could no longer reach claude.ai (constant 403 \"Session expired\" even with a fresh Firefox login).** The GitHub build runner compiled the 1.5.0 EXE with its preinstalled Python 3.12, whose bundled OpenSSL produces a TLS fingerprint Cloudflare currently blocks. The build Python is now pinned to 3.14.4 (`.python-version`) — the same runtime the EXE was always built with locally, which Cloudflare accepts. Cookie reading itself was never affected.\r\n- The widget's footer status line (e.g. \"Session expired — open claude.ai in Firefox\") no longer gets cut off at the right edge. Like the peak-hour banner, it now wraps to as many lines as needed for the current widget width — translations made these texts longer than the widget — and the window grows to keep every line visible, shrinking back once a shorter status arrives.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.5.0...v1.5.1\r\n"
+   },
+   {
+    "tag_name": "v1.5.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "### ✨ New features\r\n\r\n- **The app is now multilingual.** All visible texts — widget, tray menu, desktop notifications, update dialog, and error messages — are available in English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, and Russian. The language follows the Windows display language automatically; a new `language` option in `config.toml` (default `\"auto\"`) can pin it to a specific language. Log file entries stay English so logs remain shareable for support.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.4.3...v1.5.0\r\n"
+   },
+   {
+    "tag_name": "v1.4.3",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 💄 UI\n\n- The \"update available\" dialog shown at startup is now clearly branded as Claude Usage Tracker: it leads with the app logo and name plus an \"Update available\" header, so it's immediately obvious which app is reporting the update rather than relying on the title bar alone. The window title was shortened so it is no longer clipped in the compact dialog.\n\n### 🔧 Build / developer\n\n- The local build scripts (`build_exe.bat` / `build_exe_clean.bat`) now enforce the same quality gates as the GitHub release workflow: a CHANGELOG check for the current version, byte-compilation, the full test suite, and an abort if the existing EXE is locked — so a local build can no longer silently produce a stale or untested EXE.\n- Batch files are pinned to CRLF line endings (via `.gitattributes`) so `cmd.exe` parses them correctly regardless of editor or `core.autocrlf`.\n- The clean build now calls `build_exe.bat` by absolute path, avoiding a transient failure when the working directory was being synced.\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.4.2...v1.4.3"
+   },
+   {
+    "tag_name": "v1.4.2",
+    "draft": false,
+    "prerelease": false,
+    "body": "### ✨ New features\r\n\r\n- The version number in the title row now appears only on hover, just like the refresh / minimise / quit buttons — the resting widget stays clean.\r\n\r\n### 🐛 Bug fixes\r\n\r\n- The peak-hour warning is now fully readable at any widget size. Its text wraps to as many lines as needed and the widget grows taller to fit, instead of being clipped on the right when the widget is made narrow.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.4.1...v1.4.2\r\n"
+   },
+   {
+    "tag_name": "v1.4.1",
+    "draft": false,
+    "prerelease": false,
+    "body": "### 🐛 Bug fixes\r\n\r\n- The widget no longer creeps slightly downward on each restart or peak/non-peak transition. The peak-hour banner's grow/shrink now derives from an authoritative, banner-free window frame and re-asserts its position after Windows settles the resize — so a reverted move can no longer drift the bottom edge (or the saved position) down by the banner height.\r\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.4.0...v1.4.1\r\n"
+   },
+   {
+    "tag_name": "v1.4.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "### ✨ New features\r\n\r\n- **The running version is visible in the app** — in the widget's title row and as a header line in the tray menu.\r\n- **Skip a release you don't want.** The update dialog now has a third button, **Skip version** — that release will never be offered again, while anything newer still triggers the dialog. (Undo by clearing `skip_update_version` in the config.)\r\n- **Start with Windows.** Set `autostart = true` in the config and the app registers itself to launch at login (current user, packaged EXE only). The entry is kept in sync on every start, so a moved EXE re-registers itself automatically.\r\n- **Only one instance at a time.** Launching the EXE while it's already running now just shows a short hint instead of starting a second tray icon that doubles every request to claude.ai.\r\n- **The config file maintains itself.** `config.toml` always contains every available option. When an update introduces a new option, it is appended to your existing file with its default value on the next start — you only ever change values, never add keys.\r\n\r\n### 🔧 Under the hood\r\n\r\n- Releases are now built, tested, and published automatically on clean GitHub runners, with release notes sourced from this changelog\r\n- A test suite (33 tests) guards the config migration, usage-response parsing, notification thresholds, and the update check; CI runs it on every change\r\n- Workflow hardening: minimal token permissions, supply-chain-pinned actions (CodeQL: zero findings); Dependabot keeps the pinned actions updated\r\n- The version number now lives in a single place (`__init__.py`)\r\n\r\n### 📝 Docs\r\n\r\n- README: widget screenshot, CI badge, and a 40 % trim with the same information\r\n\n\n**Full Changelog**: https://github.com/Liwindo/ClaudeUsageTracker/compare/v1.3.0...v1.4.0"
+   },
+   {
+    "tag_name": "v1.3.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "﻿New feature:\r\n- One-shot GitHub release check at app start (update_check.py). If a newer\r\n  release exists, a dialog offers \"Open GitHub\" / \"Cancel\". Configurable via\r\n  update_check in config.toml (default on); single anonymous API request,\r\n  fails silently when offline.\r\n\r\nBug fixes:\r\n- Lowercase log_level no longer crashes at startup without an error dialog\r\n- First poll result is buffered and rendered immediately instead of being\r\n  dropped while the Tk root is still starting (no more 30 s \"connecting...\")\r\n- Reset notifications fire once per bucket instead of once per threshold;\r\n  slow rolling-window declines re-arm silently instead of toasting \"reset\"\r\n- Tray tooltips are clipped to 127 chars (NOTIFYICONDATAW.szTip limit) so a\r\n  long bucket list can no longer break every poll cycle with ValueError\r\n- Tray icon falls back to the worst bucket colour when five_hour is absent\r\n- poll_interval_seconds is floored at 10 (no more busy-loop on 0/negative);\r\n  notification_thresholds are coerced to int\r\n- Exponential backoff on HTTP 429 (doubles up to 16x, resets on success)\r\n- Firefox profile selection honours [Install...] sections and Default=1;\r\n  default-container cookies win over container cookies\r\n- %APPDATA% resolved via env var (group-policy redirected profiles)\r\n- Widget position is clamped into the virtual desktop on restore\r\n- Cross-thread Tk after() calls tolerate shutdown races (no more poller\r\n  thread death with TclError during quit); quit no longer blocks up to 5 s\r\n- Naive resets_at timestamps are treated as UTC instead of raising TypeError\r\n- User-Agent overridable via user_agent in config.toml\r\n- PyInstaller spec: plyer.platforms.win.notification hiddenimport — desktop\r\n  notifications were silently broken in the frozen EXE\r\n\r\n\n\n> **Note:** The prebuilt EXE for this legacy release has been removed. Please download the current version from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest).\n"
+   },
+   {
+    "tag_name": "v1.2.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "## What's new\n\n**Peak-hour banner** — the widget now surfaces a warning row above the session metric whenever the current time falls inside Anthropic's published peak window (weekdays 05:00–11:00 Pacific).\n\n- Hours are converted from PT to the OS's local timezone at each tick, so the displayed range adapts automatically wherever you run the tool — no hard-coded zone.\n- The widget grows **upward** when the banner appears (bottom edge anchored) and drops back down when peak ends, so the on-screen bottom position never shifts.\n- Bottom-anchored geometry is preserved across launches: the saved position file records the banner-free layout, and the banner is re-applied after the window has settled.\n\n## Fixes\n\n- Hover fade is re-evaluated immediately after a banner-driven resize, so buttons don't briefly disappear during the transition.\n- Resize-grip floor now respects the banner's extra height so the footer can never be clipped while peak is active.\n- Banner tick is guarded with `try/finally` so a transient exception can't kill the reschedule chain.\n- Bumped `tzdata` to ≥ 2026.2 for current IANA timezone data on Windows.\n\n## Download\n\nGrab `ClaudeUsageTracker.exe` below and double-click — it starts in the system tray. No Python required.\n\n> **Note:** The prebuilt EXE for this legacy release has been removed. Please download the current version from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest).\n"
+   },
+   {
+    "tag_name": "v1.1.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "## Highlights\n\nThe mini-widget gets a refined, premium glass-look surface — fully opaque, fully readable, no see-through transparency.\n\n### Widget visuals\n- 5-band vertical-gradient simulation (rim / sheen / body / base / shadow) for a layered glass feel\n- Pillow-rendered **pill progress bars** with antialiased gradient fills\n- Status dot now has a soft **radial glow halo**\n- **Gradient divider** that fades to zero at both edges\n- **Rounded outer corners** (Win11 native DWM corners / Win10 `SetWindowRgn` fallback)\n- Soft **hover-fade** for the footer buttons instead of a snap-in\n- Refined typography and palette for stronger contrast and readability\n\n### Build script\n- Fixed `build_exe.bat`: Unicode box-drawing characters in `::` comments were silently confusing CMD's parser and causing the dependency-install step to be skipped. Replaced with `REM` + ASCII dashes.\n\n## Install\nDownload the attached `ClaudeUsageTracker.exe` and run it. No installation needed.\n\n> **Note:** The prebuilt EXE for this legacy release has been removed. Please download the current version from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest).\n"
+   },
+   {
+    "tag_name": "v1.0.0",
+    "draft": false,
+    "prerelease": false,
+    "body": "Initial public release.\n\n> **Note:** The prebuilt EXE for this legacy release has been removed. Please download the current version from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest).\n"
+   }
+  ],
+  "expected": [
+   {
+    "version": "2.2.5",
+    "blocks": [
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔒 Security / hardening",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The portable C# version now ships the current .NET runtime (10.0.13).",
+        true
+       ],
+       [
+        " The portable EXE carries its own copy of .NET and WPF. 2.2.4 included version 10.0.10, which is affected by 23 published Microsoft security advisories. Each was checked against what the app does, and no way was found to trigger any of them through it: the app opens no documents, XAML, XPS or font files, prints nothing, uses no XML and loads only its own built-in images. The bundled copy is updated anyway, so its safety no longer rests on that analysis. The installer version uses the .NET Desktop Runtime installed on your PC instead; keep that up to date through Windows Update or Microsoft's download page.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The Python version is now built with Python 3.14.8 (was 3.14.4).",
+        true
+       ],
+       [
+        " Its upstream releases include security fixes, among others in the ssl and urllib modules, in tarfile/zipfile and in the bundled XML parser. Before the switch, a real request confirmed that claude.ai still accepts connections made with the new version. This matters because an earlier change of the build Python caused constant \"Session expired\" errors (see 1.5.1).",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Updated bundled libraries.",
+        true
+       ],
+       [
+        " C# version: Microsoft.Data.Sqlite and System.Net.Http.WinHttpHandler 10.0.12, SQLitePCLRaw 3.0.5. Python version: anyio 4.14.2 (contains a security fix), tzdata 2026.5, and the PyInstaller build tool 6.22.3.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.2.4",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔒 Security / hardening",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The update dialog's \"Open GitHub\" button now only ever opens a real github.com page.",
+        true
+       ],
+       [
+        " The release page address was taken from GitHub's API response and opened as-is. In the app's threat model — where even a fully compromised GitHub account must not be able to harm you — that value is untrusted, and the \"open\" action can do more than open a web page (a local path or file:///network value could launch a program). Both variants now verify the address is an https://github.com/… URL before opening it and otherwise fall back to the app's own fixed releases page. The cryptographically verified \"Download & install\" path was never affected.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The C# installer no longer downloads and silently runs the .NET runtime for you",
+        true
+       ],
+       [
+        " when it's missing. It now opens Microsoft's official, direct runtime download in your browser so you install it yourself — which means Windows checks the installer's Microsoft signature and shows \"Microsoft Corporation\" as the verified publisher, instead of the setup fetching an executable and running it with admin rights unverified. The link goes straight to the correct download, so there's nothing to hunt for.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Your settings file can no longer be corrupted by a crash or power cut while it is being saved.",
+        true
+       ],
+       [
+        " The config is now written to a temporary file and swapped into place in a single atomic step, so an interrupted save leaves either your previous settings or the complete new ones — never a half-written config.toml that the app would refuse to start from.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.2.3",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔧 Changed",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Network errors in the C# log now name the actual cause.",
+        true
+       ],
+       [
+        " A failed poll used to log only .NET's generic \"An error occurred while sending the request.\", which said nothing about why. The log line now carries the innermost cause plus the WinHTTP error code — name not resolved, TLS/security channel, cannot connect, timeout — so a recurring problem can be told apart from a passing blip without guesswork.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.2.2",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔧 Changed",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "C# in-app update now runs the normal, visible installer",
+        true
+       ],
+       [
+        " instead of a silent background install. When you choose \"Download & install\", the verified installer opens as an ordinary setup wizard (the same one you'd get by downloading it yourself) and relaunches the app when it finishes. This removes an install technique — a hidden helper silently running a freshly-downloaded file out of the temp folder — that some antivirus tools (e.g. Bitdefender) flagged as suspicious behaviour, even though the download is cryptographically verified before anything runs. The signature/hash/anti-rollback checks are unchanged; only the final launch is now indistinguishable from a normal install. The staged installer is kept under the app's own %LOCALAPPDATA% folder rather than %TEMP%, and is deleted automatically once the updated app relaunches.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.2.1",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔒 Security / hardening",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Update anti-rollback is now durable across restarts (C# installer).",
+        true
+       ],
+       [
+        " The updater already refused any release that wasn't strictly newer than the running version; it now also remembers the highest version this install has ever run (update_version_floor) and refuses anything at or below it. This closes a narrow downgrade path: even a validly-signed older release (e.g. served by a compromised GitHub account) can no longer be installed over a build that once ran something newer.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Release-integrity workflow no longer inlines the release tag into its script.",
+        true
+       ],
+       [
+        " The published tag is now passed to the verification step as an environment value instead of being expanded into the PowerShell body, removing an expression-injection foothold (only exploitable by someone who could already publish releases, but eliminated regardless).",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.2.0",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "✨ New features",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Check for updates on demand.",
+        true
+       ],
+       [
+        " Both variants now have a ",
+        false
+       ],
+       [
+        "Check for updates",
+        true
+       ],
+       [
+        " entry in the tray menu (and the C# settings dialog has a button), so you no longer have to restart to look for a new version. It clearly tells you whether an update is available, you are up to date, or the check couldn't reach GitHub — and it surfaces a release even if you previously chose \"Skip version\".",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "C# installer: one-click, cryptographically verified updates.",
+        true
+       ],
+       [
+        " The installed C# build can now download and install a newer release for you (",
+        false
+       ],
+       [
+        "Download & install",
+        true
+       ],
+       [
+        " in the update dialog) instead of only opening the GitHub page. Security was the priority: the app installs an update ",
+        false
+       ],
+       [
+        "only",
+        true
+       ],
+       [
+        " if a signature made with an offline key — one that never exists on GitHub or in CI — verifies against a public key built into the app, the download's SHA-256 matches that signed manifest, and the version is strictly newer. Anything else is refused and nothing is run. The portable EXE and the Python variant keep opening the GitHub page (a single-file EXE can't safely replace itself).",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "C# variant: the widget no longer jumps when Anthropic's peak-hour banner appears or disappears.",
+        true
+       ],
+       [
+        " Its bottom edge is now anchored, so the extra banner height grows the window upward and the resting position stays put across every peak/non-peak transition — matching the Python variant (which fixed the same issue in 1.4.1). The saved position is stored as a height-invariant bottom anchor, so restarting during peak hours can no longer drift the widget.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.1.1",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The tray tooltip no longer shows a bogus third \"Unknown (spend)\" entry behind the session and weekly values.",
+        true
+       ],
+       [
+        " claude.ai's usage response recently gained a spend object (credit-balance metadata, not a usage limit); both variants mistook every non-extra_usage object for a usage bucket and rendered it with the generic \"Unknown (…)\" label. A response object is now only treated as a bucket when it carries a real utilization value, so genuinely new limit buckets still appear while metadata like spend is ignored.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "2.1.0",
+    "blocks": [
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "The tracker now ships in ",
+        false
+       ],
+       [
+        "two variants",
+        true
+       ],
+       [
+        " in every release — pick one on the \"Which version is for me?\" table. Both monitor the same claude.ai limits and read the same Firefox cookies; they share one version number from now on (which is why the Python variant jumps from 1.5.2 straight to 2.1.0).",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "✨ C# variant (new)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "First release of the C#/.NET 10 port, available two ways:",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 1,
+      "spans": [
+       [
+        "ClaudeUsageTracker-Setup-2.1.0.exe — per-user installer (no admin rights): Start-menu entry, optional autostart, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 1,
+      "spans": [
+       [
+        "ClaudeUsageTracker-Portable-2.1.0.exe — everything in a single EXE, no installation, no dependencies.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "What it adds over the Python variant: a ",
+        false
+       ],
+       [
+        "settings dialog",
+        true
+       ],
+       [
+        " (no more hand-editing config.toml), ",
+        false
+       ],
+       [
+        "clickable notifications",
+        true
+       ],
+       [
+        " (click → claude.ai, missed ones land in the Action Center), an ",
+        false
+       ],
+       [
+        "instant re-poll",
+        true
+       ],
+       [
+        " after standby resume or network return (offline it doesn't poll at all), efficiency mode (EcoQoS), per-monitor DPI sharpness, edge snapping, animated bars — and a smaller memory footprint.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Runs side by side with the Python variant: own config folder (%APPDATA%\\claude-usage-tracker-cs), own autostart entry, own process name.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐍 Python variant",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "No functional changes — ClaudeUsageTracker.exe keeps working exactly as in 1.5.2; the version only moves in lockstep with the new C# variant.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "📦 Both",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Releases now include a SHA256SUMS.txt with checksums of all three EXEs.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.5.2",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "When the 5-hour session window has ended and the next one hasn't started yet, the widget footer now says \"Waiting for first message\" (translated into all 9 languages) instead of the garbled \"reset resetting…\". A new session only begins with your first message, so there is no countdown to show in that state.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.5.1",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The released EXE could no longer reach claude.ai (constant 403 \"Session expired\" even with a fresh Firefox login).",
+        true
+       ],
+       [
+        " The GitHub build runner compiled the 1.5.0 EXE with its preinstalled Python 3.12, whose bundled OpenSSL produces a TLS fingerprint Cloudflare currently blocks. The build Python is now pinned to 3.14.4 (.python-version) — the same runtime the EXE was always built with locally, which Cloudflare accepts. Cookie reading itself was never affected.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The widget's footer status line (e.g. \"Session expired — open claude.ai in Firefox\") no longer gets cut off at the right edge. Like the peak-hour banner, it now wraps to as many lines as needed for the current widget width — translations made these texts longer than the widget — and the window grows to keep every line visible, shrinking back once a shorter status arrives.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.5.0",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "✨ New features",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The app is now multilingual.",
+        true
+       ],
+       [
+        " All visible texts — widget, tray menu, desktop notifications, update dialog, and error messages — are available in English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, and Russian. The language follows the Windows display language automatically; a new language option in config.toml (default \"auto\") can pin it to a specific language. Log file entries stay English so logs remain shareable for support.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.4.3",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "💄 UI",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The \"update available\" dialog shown at startup is now clearly branded as Claude Usage Tracker: it leads with the app logo and name plus an \"Update available\" header, so it's immediately obvious which app is reporting the update rather than relying on the title bar alone. The window title was shortened so it is no longer clipped in the compact dialog.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔧 Build / developer",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The local build scripts (build_exe.bat / build_exe_clean.bat) now enforce the same quality gates as the GitHub release workflow: a CHANGELOG check for the current version, byte-compilation, the full test suite, and an abort if the existing EXE is locked — so a local build can no longer silently produce a stale or untested EXE.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Batch files are pinned to CRLF line endings (via .gitattributes) so cmd.exe parses them correctly regardless of editor or core.autocrlf.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The clean build now calls build_exe.bat by absolute path, avoiding a transient failure when the working directory was being synced.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.4.2",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "✨ New features",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The version number in the title row now appears only on hover, just like the refresh / minimise / quit buttons — the resting widget stays clean.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The peak-hour warning is now fully readable at any widget size. Its text wraps to as many lines as needed and the widget grows taller to fit, instead of being clipped on the right when the widget is made narrow.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.4.1",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🐛 Bug fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The widget no longer creeps slightly downward on each restart or peak/non-peak transition. The peak-hour banner's grow/shrink now derives from an authoritative, banner-free window frame and re-asserts its position after Windows settles the resize — so a reverted move can no longer drift the bottom edge (or the saved position) down by the banner height.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.4.0",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "✨ New features",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The running version is visible in the app",
+        true
+       ],
+       [
+        " — in the widget's title row and as a header line in the tray menu.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Skip a release you don't want.",
+        true
+       ],
+       [
+        " The update dialog now has a third button, ",
+        false
+       ],
+       [
+        "Skip version",
+        true
+       ],
+       [
+        " — that release will never be offered again, while anything newer still triggers the dialog. (Undo by clearing skip_update_version in the config.)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Start with Windows.",
+        true
+       ],
+       [
+        " Set autostart = true in the config and the app registers itself to launch at login (current user, packaged EXE only). The entry is kept in sync on every start, so a moved EXE re-registers itself automatically.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Only one instance at a time.",
+        true
+       ],
+       [
+        " Launching the EXE while it's already running now just shows a short hint instead of starting a second tray icon that doubles every request to claude.ai.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The config file maintains itself.",
+        true
+       ],
+       [
+        " config.toml always contains every available option. When an update introduces a new option, it is appended to your existing file with its default value on the next start — you only ever change values, never add keys.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "🔧 Under the hood",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Releases are now built, tested, and published automatically on clean GitHub runners, with release notes sourced from this changelog",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "A test suite (33 tests) guards the config migration, usage-response parsing, notification thresholds, and the update check; CI runs it on every change",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Workflow hardening: minimal token permissions, supply-chain-pinned actions (CodeQL: zero findings); Dependabot keeps the pinned actions updated",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The version number now lives in a single place (__init__.py)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "📝 Docs",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "README: widget screenshot, CI badge, and a 40 % trim with the same information",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.3.0",
+    "blocks": [
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "New feature:",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "One-shot GitHub release check at app start (update_check.py). If a newer release exists, a dialog offers \"Open GitHub\" / \"Cancel\". Configurable via update_check in config.toml (default on); single anonymous API request, fails silently when offline.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Bug fixes:",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Lowercase log_level no longer crashes at startup without an error dialog",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "First poll result is buffered and rendered immediately instead of being dropped while the Tk root is still starting (no more 30 s \"connecting...\")",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Reset notifications fire once per bucket instead of once per threshold; slow rolling-window declines re-arm silently instead of toasting \"reset\"",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Tray tooltips are clipped to 127 chars (NOTIFYICONDATAW.szTip limit) so a long bucket list can no longer break every poll cycle with ValueError",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Tray icon falls back to the worst bucket colour when five_hour is absent",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "poll_interval_seconds is floored at 10 (no more busy-loop on 0/negative); notification_thresholds are coerced to int",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Exponential backoff on HTTP 429 (doubles up to 16x, resets on success)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Firefox profile selection honours [Install...] sections and Default=1; default-container cookies win over container cookies",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "%APPDATA% resolved via env var (group-policy redirected profiles)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Widget position is clamped into the virtual desktop on restore",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Cross-thread Tk after() calls tolerate shutdown races (no more poller thread death with TclError during quit); quit no longer blocks up to 5 s",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Naive resets_at timestamps are treated as UTC instead of raising TypeError",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "User-Agent overridable via user_agent in config.toml",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "PyInstaller spec: plyer.platforms.win.notification hiddenimport — desktop notifications were silently broken in the frozen EXE",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Note:",
+        true
+       ],
+       [
+        " The prebuilt EXE for this legacy release has been removed. Please download the current version from the latest release.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.2.0",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "What's new",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Peak-hour banner",
+        true
+       ],
+       [
+        " — the widget now surfaces a warning row above the session metric whenever the current time falls inside Anthropic's published peak window (weekdays 05:00–11:00 Pacific).",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Hours are converted from PT to the OS's local timezone at each tick, so the displayed range adapts automatically wherever you run the tool — no hard-coded zone.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "The widget grows ",
+        false
+       ],
+       [
+        "upward",
+        true
+       ],
+       [
+        " when the banner appears (bottom edge anchored) and drops back down when peak ends, so the on-screen bottom position never shifts.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Bottom-anchored geometry is preserved across launches: the saved position file records the banner-free layout, and the banner is re-applied after the window has settled.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Fixes",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Hover fade is re-evaluated immediately after a banner-driven resize, so buttons don't briefly disappear during the transition.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Resize-grip floor now respects the banner's extra height so the footer can never be clipped while peak is active.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Banner tick is guarded with try/finally so a transient exception can't kill the reschedule chain.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Bumped tzdata to ≥ 2026.2 for current IANA timezone data on Windows.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Download",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Grab ClaudeUsageTracker.exe below and double-click — it starts in the system tray. No Python required.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Note:",
+        true
+       ],
+       [
+        " The prebuilt EXE for this legacy release has been removed. Please download the current version from the latest release.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.1.0",
+    "blocks": [
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Highlights",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "The mini-widget gets a refined, premium glass-look surface — fully opaque, fully readable, no see-through transparency.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Widget visuals",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "5-band vertical-gradient simulation (rim / sheen / body / base / shadow) for a layered glass feel",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Pillow-rendered ",
+        false
+       ],
+       [
+        "pill progress bars",
+        true
+       ],
+       [
+        " with antialiased gradient fills",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Status dot now has a soft ",
+        false
+       ],
+       [
+        "radial glow halo",
+        true
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Gradient divider",
+        true
+       ],
+       [
+        " that fades to zero at both edges",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Rounded outer corners",
+        true
+       ],
+       [
+        " (Win11 native DWM corners / Win10 SetWindowRgn fallback)",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Soft ",
+        false
+       ],
+       [
+        "hover-fade",
+        true
+       ],
+       [
+        " for the footer buttons instead of a snap-in",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Refined typography and palette for stronger contrast and readability",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Build script",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "bullet",
+      "level": 0,
+      "spans": [
+       [
+        "Fixed build_exe.bat: Unicode box-drawing characters in :: comments were silently confusing CMD's parser and causing the dependency-install step to be skipped. Replaced with REM + ASCII dashes.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "heading",
+      "level": 0,
+      "spans": [
+       [
+        "Install",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Download the attached ClaudeUsageTracker.exe and run it. No installation needed.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Note:",
+        true
+       ],
+       [
+        " The prebuilt EXE for this legacy release has been removed. Please download the current version from the latest release.",
+        false
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "version": "1.0.0",
+    "blocks": [
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Initial public release.",
+        false
+       ]
+      ]
+     },
+     {
+      "kind": "text",
+      "level": 0,
+      "spans": [
+       [
+        "Note:",
+        true
+       ],
+       [
+        " The prebuilt EXE for this legacy release has been removed. Please download the current version from the latest release.",
+        false
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

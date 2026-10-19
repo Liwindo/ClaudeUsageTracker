@@ -36,6 +36,9 @@ STRINGS: dict[str, str] = {
     # Widget
     "widget.metric.session": "Session",
     "widget.metric.weekly": "Weekly",
+    # Session forecast after the session label (R-widget-8)
+    "widget.forecast.lasts": "lasts until reset",
+    "widget.forecast.runs_out": "limit in {countdown}",
     "widget.status.connecting": "connecting…",
     "widget.status.active": "active",
     "widget.status.reset_in": "reset {countdown}",
@@ -54,13 +57,17 @@ STRINGS: dict[str, str] = {
     # Update dialog
     "update.window_title": "Update",
     "update.available": "Update available",
-    "update.version_available": "Version {version} is available",
-    "update.running_version": "You are running version {version}.",
     "update.cancel": "Cancel",
     "update.skip": "Skip version",
     "update.open_github": "Open GitHub",
     "update.up_to_date": "You are running the latest version ({version}).",
     "update.check_failed": "Could not check for updates. Please try again later.",
+    "update.notes_version": "Version {version}",
+    "update.notes_unavailable": "The release notes could not be loaded. They are on the GitHub release page.",
+    "update.notes_more": "Older changes are listed on GitHub.",
+    "update.versions": "Versions",
+    "update.latest": "latest",
+    "update.installed": "installed",
 
     # Startup dialogs
     "dialog.already_running.title": "Claude Usage Tracker",

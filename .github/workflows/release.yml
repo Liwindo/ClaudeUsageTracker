@@ -120,6 +120,17 @@ jobs:
             Write-Host "Stamped '## Unreleased' as '## $version $dash $date'."
           }
 
+      # Guard before anything is pushed: the CHANGELOG becomes the release
+      # notes shown in the update dialog, and Windows 10 draws newer emoji as
+      # empty boxes (R-rel-6). Stdlib-only script, the runner's Python is fine.
+      - name: Check CHANGELOG emoji render on Windows 10
+        run: python scripts/check_changelog_emoji.py
+
+      # Same guard for the docs: a release never ships with docs that miss a
+      # module, file, asset, script, workflow or config key (R-rel-7).
+      - name: Check the docs cover the repo
+        run: python scripts/check_docs.py
+
       - name: Commit and tag
         if: github.event_name == 'workflow_dispatch'
         shell: pwsh

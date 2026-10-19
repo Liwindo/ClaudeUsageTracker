@@ -13,6 +13,7 @@ import threading
 import time
 
 from .config import Config
+from .forecast import SessionForecaster
 from .models import UsageData
 from .notifications import NotificationManager
 from .poller import Poller
@@ -34,6 +35,7 @@ class App:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._notifier = NotificationManager(config.notification_thresholds)
+        self._forecaster = SessionForecaster()
 
         self._widget = Widget(
             on_refresh=self._on_refresh_requested,
@@ -66,7 +68,7 @@ class App:
     def _on_data(self, data: UsageData) -> None:
         self._tray.update(data)
         self._notifier.process(data)
-        self._widget.update(data)
+        self._widget.update(data, self._forecaster.observe_data(data))
 
     def _on_error(self, message: str) -> None:
         self._tray.set_error(message)
@@ -90,6 +92,7 @@ class App:
                 info.latest_version,
                 info.url,
                 on_skip=lambda v=info.latest_version: self._skip_update(v),
+                notes=info.notes,
             )
 
     def _on_check_updates_requested(self) -> None:
@@ -111,6 +114,7 @@ class App:
                 info.latest_version,
                 info.url,
                 on_skip=lambda v=info.latest_version: self._skip_update(v),
+                notes=info.notes,
             )
         elif result.status == STATUS_UP_TO_DATE:
             self._widget.notify_message(

@@ -9,6 +9,7 @@ Not sure which variant you want? See ["Which version is for me?"](../README.md#w
 ## What it adds over the Python variant
 
 - **Settings dialog** (tray/widget → "Settings…"): edits every config.toml option without touching the file. Poll interval, thresholds, autostart, and log level apply immediately; language changes apply on the next start.
+- **One-click, signature-verified updates** (installer version only): "Download & install" in the update dialog fetches the new release and runs its installer only after the signature and hash checks pass (see "Secure in-app updates & release signing" below). The portable EXE opens the GitHub page instead.
 - **Clickable notifications** — clicking one opens claude.ai; missed notifications land in the Action Center.
 - **Instant re-poll on standby resume and network return**; while offline it does not poll at all (no error flicker).
 - **EcoQoS/efficiency mode**, **ReadyToRun** (faster start), **per-monitor V2 DPI awareness**, edge snapping while dragging the widget, animated bars.
@@ -22,7 +23,12 @@ Configuration lives in `%APPDATA%\claude-usage-tracker-cs\config.toml` — same 
 ClaudeUsageTracker/        WPF app (net10.0-windows, UI entirely in code — no XAML)
 ├─ Program.cs              Entry point: mutex, config, i18n, logging, autostart, EcoQoS
 ├─ AppOrchestrator.cs      Wires poller, widget, tray, notifications, update check, triggers
+├─ AppPaths.cs             Own data folders (%APPDATA%\claude-usage-tracker-cs, update staging)
+├─ Log.cs                  Thread-safe file logger with size-based rotation
+├─ Models.cs               Usage-response data models (REVERSE-ENGINEERED schema)
+├─ SessionForecast.cs      Session forecast: does the 5-hour limit last until the reset?
 ├─ WidgetWindow.cs         Always-on-top widget
+├─ WidgetGeometry.cs       Pure bottom-anchor geometry of the widget (unit-tested)
 ├─ SettingsWindow.cs       Settings dialog (an editor over config.toml)
 ├─ TrayIcon.cs             WinForms NotifyIcon (colour circle, menu, clickable toasts)
 ├─ Poller.cs               Background thread, 30 s interval, 429 backoff, offline skip
@@ -32,14 +38,18 @@ ClaudeUsageTracker/        WPF app (net10.0-windows, UI entirely in code — no 
 ├─ I18n.cs + Locales/*.json  9 languages (exported from python/, see scripts/)
 ├─ NotificationManager.cs  Thresholds + hysteresis + reset detection, live updates
 ├─ UpdateCheck.cs          GitHub release check (once per start + manual)
+├─ ReleaseNotes.cs         Release notes for the update dialog (untrusted Markdown → plain text)
+├─ UpdateDialog.cs         The update dialog (version list + notes, in-app install)
 ├─ UpdateVerifier.cs       Pure trust gate: signature/digest/anti-rollback/host (shared w/ UpdateTool)
 ├─ UpdateManifest.cs       Strict parser for the signed update.json
-├─ UpdateInstaller.cs      Verified download + silent per-user install + relaunch (installer build only)
-├─ UpdateKeys.json         Embedded update-signing PUBLIC key(s) — the trust anchor
+├─ UpdateInstaller.cs      Verified download + visible installer + relaunch (installer build only)
+├─ UpdateKeys.cs + UpdateKeys.json  Embedded update-signing PUBLIC key(s) — the trust anchor
 ├─ Autostart.cs            HKCU Run key "ClaudeUsageTrackerCS"
 ├─ SystemTriggers.cs       Instant poll on resume/network return
 ├─ EfficiencyMode.cs       EcoQoS (E-cores/throttling while idle)
 ├─ WorkingSetTrimmer.cs    RAM trimming for idle operation
+├─ Assets/                 logo.ico (EXE icon), logo.png, logo_tile.png + logo_tile.ico
+│                          (opaque tile logo for the update dialog and its title bar)
 └─ app.manifest            Per-monitor V2 DPI
 ClaudeUsageTracker.Tests/  xunit test suite
 UpdateTool/                Offline keygen / sign / verify CLI (net10.0, links UpdateVerifier)

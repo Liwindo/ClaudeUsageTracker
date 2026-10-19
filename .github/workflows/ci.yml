@@ -1,15 +1,16 @@
 name: CI (Python)
 
 # Path-filtered to the Python variant plus everything shared (scripts/,
-# workflows). csharp/-only changes run ci-csharp.yml instead, which has its
-# own matching automerge job — so python/, actions and nuget Dependabot PRs
-# all auto-merge patch/minor bumps once their tests pass.
+# workflows, and the root docs for the CHANGELOG emoji and docs checks).
+# csharp/-only changes run ci-csharp.yml instead, which has its own matching
+# automerge job — so python/, actions and nuget Dependabot PRs all auto-merge
+# patch/minor bumps once their tests pass.
 on:
   push:
     branches: [master]
-    paths: ['python/**', 'scripts/**', '.github/**']
+    paths: ['python/**', 'scripts/**', '.github/**', '*.md']
   pull_request:
-    paths: ['python/**', 'scripts/**', '.github/**']
+    paths: ['python/**', 'scripts/**', '.github/**', '*.md']
 
 permissions:
   contents: read
@@ -44,6 +45,14 @@ jobs:
 
       - name: Verify C# locale catalogs match the Python source
         run: uv run python ../scripts/export_locales.py --check
+
+      - name: Check CHANGELOG emoji render on Windows 10
+        run: uv run python ../scripts/check_changelog_emoji.py
+
+      # Every module, file, asset, script, workflow and config key must be
+      # named in the docs (R-rel-7).
+      - name: Check the docs cover the repo
+        run: uv run python ../scripts/check_docs.py
 
       - name: Byte-compile sources
         run: uv run python -m compileall -q src/claude_usage_monitor

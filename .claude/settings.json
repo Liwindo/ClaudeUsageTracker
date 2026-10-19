@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "input=$(cat); printf '%s' \"$input\" | grep -Eq 'git[^\"]*commit' || exit 0; printf '%s' \"$input\" | uv run --no-project python \"$CLAUDE_PROJECT_DIR/scripts/doc_commit_guard.py\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

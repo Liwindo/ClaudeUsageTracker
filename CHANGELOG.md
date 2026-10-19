@@ -7,6 +7,23 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### ✨ New features
+
+- **The widget now tells you whether your session limit will last.** Behind "Session" above the session bar it shows "· lasts until reset", or, if your pace of the last 30 minutes would use up the limit before it resets, "· limit in 1h 20m" in orange. It needs about 10 minutes of data after the app starts or a new 5-hour window begins, and shows nothing until then. It is calculated from the values the app already fetches, so it makes no extra requests. If the widget is made too narrow for the text, the forecast is hidden rather than cut off.
+- **The update dialog now shows what changed.** Before you update, the dialog lists every version between the one you are running and the one on offer, newest first; click one (or use the arrow keys) to read its release notes. If you skipped a few updates, you see all of them, not just the latest. The text is loaded live from the GitHub releases, so it is always the current release text. It is shown as plain text: links in it cannot be clicked, the "Open GitHub" button stays the only way to the release page. If the notes cannot be loaded, the dialog still opens and says so.
+
+### 💄 UI
+
+- **A redesigned update dialog.** Versions on the left, the selected version's notes on the right, the installed version for reference, and one clearly marked main button ("Download & install" in the installed C# version, "Open GitHub" otherwise). The window can be resized freely.
+- **The update dialog's title bar is now dark and its icon visible.** The window icon used to fade into the white Windows 10 title bar; the dialog now uses a dark title bar and an opaque version of the logo.
+
+### 🔧 Build / developer
+
+- **The CHANGELOG may only use emoji that Windows 10 can draw.** Every section ends up in the update dialog, and Windows 10 shows newer emoji as empty boxes. `scripts/check_changelog_emoji.py` checks this in CI and in the release workflow before anything is pushed.
+- **The docs can no longer silently fall behind the code.** `scripts/check_docs.py` fails CI and the release when a module, file, asset, script, workflow or config key is not documented, and `scripts/doc_sweep.py` lists every doc line a change touches so outdated descriptions are found before they ship; for Claude Code, a project hook blocks commits until that review is done. Several outdated passages were corrected along the way (the installer's .NET runtime handling, the C#-only one-click updates, the draft-and-sign release flow).
+
 ## 2.2.5 — 2026-10-17
 
 A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.

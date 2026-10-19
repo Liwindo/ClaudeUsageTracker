@@ -18,6 +18,7 @@ public sealed class AppOrchestrator
     private readonly TrayIcon _tray;
     private readonly NotificationManager _notifier;
     private readonly Poller _poller;
+    private readonly SessionForecaster _forecaster = new(); // poller thread only
     private SystemTriggers? _triggers;
     private Timer? _trimTimer;
     private bool _quitting;
@@ -79,7 +80,7 @@ public sealed class AppOrchestrator
             _tray.Update(data);
             _notifier.Process(data);
         });
-        _widget.UpdateData(data);
+        _widget.UpdateData(data, _forecaster.Observe(data));
     }
 
     private void OnError(string message)
