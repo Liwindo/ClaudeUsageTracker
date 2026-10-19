@@ -1,0 +1,22 @@
+{
+  "_comment": "Shared by test_forecast.py and SessionForecastTests.cs (R-widget-8). Each case feeds [t, percent, resets_at] in seconds to one fresh forecaster; expect is the forecast after the last observation.",
+  "cases": [
+    {"name": "single sample", "obs": [[0, 10, 18000]], "expect": {"state": "none"}},
+    {"name": "span below 10 min", "obs": [[0, 10, 18000], [540, 20, 18000]], "expect": {"state": "none"}},
+    {"name": "rising pace hits limit before reset", "obs": [[0, 10, 18000], [300, 15, 18000], [600, 20, 18000]], "expect": {"state": "runs_out", "seconds": 4800}},
+    {"name": "flat usage lasts", "obs": [[0, 30, 18000], [600, 30, 18000]], "expect": {"state": "lasts"}},
+    {"name": "declining usage lasts", "obs": [[0, 30, 18000], [600, 28, 18000]], "expect": {"state": "lasts"}},
+    {"name": "limit after reset lasts", "obs": [[0, 10, 3000], [600, 20, 3000]], "expect": {"state": "lasts"}},
+    {"name": "limit exactly at reset lasts", "obs": [[0, 20, 4800], [600, 30, 4800]], "expect": {"state": "lasts"}},
+    {"name": "limit just before reset runs out", "obs": [[0, 20, 4801], [600, 30, 4801]], "expect": {"state": "runs_out", "seconds": 4200}},
+    {"name": "at 100 percent nothing", "obs": [[0, 90, 18000], [600, 100, 18000]], "expect": {"state": "none"}},
+    {"name": "window already over", "obs": [[0, 10, 500], [600, 20, 500]], "expect": {"state": "none"}},
+    {"name": "new window drops old samples", "obs": [[0, 10, 18000], [600, 40, 18000], [700, 0, 36000], [1400, 5, 36000]], "expect": {"state": "runs_out", "seconds": 13300}},
+    {"name": "sub-second resets_at jitter keeps window", "obs": [[0, 10, 18000.1], [600, 20, 18000.9]], "expect": {"state": "runs_out", "seconds": 4800}},
+    {"name": "resets_at moved 599 s keeps window", "obs": [[0, 10, 18000], [600, 20, 18599]], "expect": {"state": "runs_out", "seconds": 4800}},
+    {"name": "resets_at moved 601 s is a new window", "obs": [[0, 10, 18000], [600, 20, 18601]], "expect": {"state": "none"}},
+    {"name": "pace uses only the last 30 min", "obs": [[0, 0, 18000], [600, 50, 18000], [2400, 60, 18000]], "expect": {"state": "runs_out", "seconds": 7200}},
+    {"name": "gap longer than the window restarts measuring", "obs": [[0, 10, 18000], [600, 20, 18000], [5000, 30, 18000]], "expect": {"state": "none"}},
+    {"name": "clock going back restarts measuring", "obs": [[1000, 10, 18000], [1600, 20, 18000], [1500, 21, 18000]], "expect": {"state": "none"}}
+  ]
+}

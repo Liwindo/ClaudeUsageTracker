@@ -58,6 +58,9 @@
          source read by the offline signing tool and the CI integrity guard. -->
     <EmbeddedResource Include="UpdateKeys.json" />
     <Resource Include="Assets\logo.png" />
+    <!-- Opaque, tile-cropped logo for the update dialog and its title bar. -->
+    <Resource Include="Assets\logo_tile.png" />
+    <Resource Include="Assets\logo_tile.ico" />
   </ItemGroup>
 
   <ItemGroup>

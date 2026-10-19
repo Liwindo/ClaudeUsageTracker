@@ -38,23 +38,19 @@ public sealed class LimitInfo
         Math.Max(0.0, (ResetsAt - DateTimeOffset.UtcNow).TotalSeconds);
 
     /// <summary>Human-readable countdown string, e.g. "3h 42m".</summary>
-    public string ResetCountdown
+    // An expired window is a caller-level state (the widget shows "waiting for
+    // first message"); the countdown stays a duration.
+    public string ResetCountdown => FormatCountdown(ResetsInSeconds);
+
+    /// <summary>Duration as hours + minutes, e.g. "3h 42m"; below an hour "42m".</summary>
+    public static string FormatCountdown(double seconds)
     {
-        get
-        {
-            var secs = (long)ResetsInSeconds;
-            if (secs <= 0)
-            {
-                // An expired window is a caller-level state (the widget shows
-                // "waiting for first message"); the countdown stays a duration.
-                return I18n.Tr("countdown.minutes", ("minutes", 0));
-            }
-            var hours = secs / 3600;
-            var minutes = secs % 3600 / 60;
-            if (hours > 0)
-                return I18n.Tr("countdown.hours_minutes", ("hours", hours), ("minutes", minutes));
-            return I18n.Tr("countdown.minutes", ("minutes", minutes));
-        }
+        var secs = Math.Max(0L, (long)seconds);
+        var hours = secs / 3600;
+        var minutes = secs % 3600 / 60;
+        if (hours > 0)
+            return I18n.Tr("countdown.hours_minutes", ("hours", hours), ("minutes", minutes));
+        return I18n.Tr("countdown.minutes", ("minutes", minutes));
     }
 
     /// <summary>Extract integer percent from the utilization field.

@@ -16,7 +16,10 @@ namespace ClaudeUsageTracker;
 /// <summary>One asset attached to a GitHub release.</summary>
 public sealed record ReleaseAsset(string Name, string DownloadUrl);
 
-public sealed record UpdateInfo(string LatestVersion, string Url, IReadOnlyList<ReleaseAsset> Assets);
+/// <summary><see cref="Notes"/> is what changed since the running version; null
+/// when the notes could not be loaded (the dialog then says so and points to GitHub).</summary>
+public sealed record UpdateInfo(string LatestVersion, string Url, IReadOnlyList<ReleaseAsset> Assets,
+    ReleaseNotes? Notes = null);
 
 public enum UpdateCheckStatus { UpToDate, Available, Failed }
 
@@ -32,6 +35,9 @@ public static partial class UpdateCheck
 {
     private const string Repo = "Liwindo/ClaudeUsageTracker";
     private static readonly string ReleasesApi = $"https://api.github.com/repos/{Repo}/releases/latest";
+    // The release list, for the notes of every version between the running and
+    // the latest one. 30 entries cover far more than the MaxReleases shown.
+    private static readonly string ReleaseListApi = $"https://api.github.com/repos/{Repo}/releases?per_page=30";
     public static readonly string RepoReleasesUrl = $"https://github.com/{Repo}/releases/latest";
 
     [GeneratedRegex(@"^v?(\d+(?:\.\d+)*)")]
@@ -115,25 +121,15 @@ public static partial class UpdateCheck
     /// date" from "the check failed" — the manual "check now" action needs that
     /// difference so it never claims you are current after a network error.
     /// Never throws. Pass skipVersion="" (the default) for a manual check so a
-    /// previously-skipped release is still surfaced.</summary>
+    /// previously-skipped release is still surfaced. When an update is
+    /// available, its release notes are fetched as well before returning (this
+    /// runs on a background thread), so the dialog opens complete.</summary>
     public static UpdateCheckResult CheckDetailed(string skipVersion = "")
     {
         string body;
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-            using var request = new HttpRequestMessage(HttpMethod.Get, ReleasesApi);
-            request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
-            // GitHub's API rejects requests without a User-Agent.
-            request.Headers.TryAddWithoutValidation("User-Agent", "claude-usage-tracker-cs");
-            using var resp = http.Send(request);
-            if ((int)resp.StatusCode != 200)
-            {
-                Log.Info("update", $"Update check: GitHub returned {(int)resp.StatusCode}.");
-                return UpdateCheckResult.Failed;
-            }
-            using var reader = new StreamReader(resp.Content.ReadAsStream());
-            body = reader.ReadToEnd();
+            body = GetString(ReleasesApi);
         }
         catch (Exception exc)
         {
@@ -141,7 +137,48 @@ public static partial class UpdateCheck
             return UpdateCheckResult.Failed;
         }
 
-        return Evaluate(body, skipVersion, CurrentVersion);
+        var result = Evaluate(body, skipVersion, CurrentVersion);
+        if (result.Status == UpdateCheckStatus.Available && result.Info is not null)
+            result = result with { Info = result.Info with { Notes = FetchReleaseNotes(result.Info.LatestVersion) } };
+        return result;
+    }
+
+    /// <summary>The notes of every release after the running version up to the
+    /// latest, read live from GitHub. Never throws: the notes are a
+    /// convenience, so any failure just yields null and the update dialog
+    /// still opens. R-life-6.</summary>
+    internal static ReleaseNotes? FetchReleaseNotes(string latestVersion)
+    {
+        string payload;
+        try
+        {
+            payload = GetString(ReleaseListApi);
+        }
+        catch (Exception exc)
+        {
+            Log.Info("update", $"Release notes unavailable: {exc.Message}");
+            return null;
+        }
+        var notes = ReleaseNotesParser.Select(payload, CurrentVersion, latestVersion);
+        if (notes is null)
+            Log.Info("update", "Release notes unavailable: no usable release body.");
+        return notes;
+    }
+
+    /// <summary>GET a GitHub API URL and return the body. Throws on any
+    /// failure, including a non-200 status.</summary>
+    private static string GetString(string url)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
+        // GitHub's API rejects requests without a User-Agent.
+        request.Headers.TryAddWithoutValidation("User-Agent", "claude-usage-tracker-cs");
+        using var resp = http.Send(request);
+        if ((int)resp.StatusCode != 200)
+            throw new HttpRequestException($"GitHub returned {(int)resp.StatusCode}");
+        using var reader = new StreamReader(resp.Content.ReadAsStream());
+        return reader.ReadToEnd();
     }
 
     /// <summary>Pure decision over an already-fetched release payload — no

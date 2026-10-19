@@ -13,7 +13,7 @@ import ctypes
 import json
 import sys
 import tkinter as tk
-import webbrowser
+from tkinter import font as tkfont
 from tkinter import messagebox
 from datetime import datetime
 from pathlib import Path
@@ -24,8 +24,10 @@ from PIL import Image, ImageDraw, ImageTk
 
 from . import __version__
 from .config import _config_dir, log_file_path
+from .forecast import NONE as NO_FORECAST, STATE_LASTS, STATE_RUNS_OUT, Forecast
 from .i18n import tr
-from .models import UsageData
+from .models import UsageData, format_countdown
+from .release_notes import ReleaseNotes
 
 # ── Design tokens — opaque vertical-gradient palette ──────────────────────────
 # Top → bottom gradient simulation (5 bands stacked top-to-bottom):
@@ -54,6 +56,16 @@ _FONT_LBL   = ("Segoe UI", 8)
 _FONT_PCT   = ("Consolas", 11, "bold")
 _FONT_FT    = ("Consolas", 8)
 _FONT_BTN   = ("Segoe UI", 9)
+
+# Update dialog (update_dialog.py) — same values as UpdateDialog.cs.
+_SIDEBAR    = "#121217"   # version list column
+_DIVIDER    = "#24242c"   # hairlines inside the dialog
+_BODY       = "#b4b4c0"   # release-note body text (bold lead-ins use _TEXT)
+_ROW_HOV    = "#1a1a21"   # hovered version row (selected rows use _TRACK)
+_CHIP_BG    = "#15291d"   # "latest" chip behind _OK text
+_ON_OK      = "#0b1a10"   # text on the green primary button
+_OK_HOV     = "#16a34a"   # primary button hover
+_INFO_BG    = "#1c1c23"   # "notes unavailable" box
 
 _W       = 256
 _CARD_PADX = 18   # inner horizontal padding of the card frame
@@ -316,6 +328,17 @@ def _div_image(width: int) -> "ImageTk.PhotoImage":
     return img
 
 
+def forecast_text(forecast: Forecast) -> tuple[str, str]:
+    """Text (with its " · " lead-in) and colour of the session forecast;
+    empty text when there is nothing to show."""
+    if forecast.state == STATE_RUNS_OUT:
+        countdown = format_countdown(forecast.seconds)
+        return f" · {tr('widget.forecast.runs_out', countdown=countdown)}", _WARN
+    if forecast.state == STATE_LASTS:
+        return f" · {tr('widget.forecast.lasts')}", _DIM
+    return "", _DIM
+
+
 class Widget:
     """Always-on-top glass widget with acrylic / mica blur on Windows."""
 
@@ -341,6 +364,12 @@ class Widget:
         self._lbl_ver: Optional[tk.Label] = None  # version — hover-revealed
         self._peak_banner: Optional[tk.Label] = None
         self._session_row: Optional[tk.Frame] = None
+        # Session forecast after the session label (R-widget-8): shown in
+        # full or not at all, never clipped.
+        self._lbl_s_name: Optional[tk.Label] = None
+        self._lbl_fc: Optional[tk.Label] = None
+        self._forecast_text: str = ""
+        self._forecast_fg: str = _DIM
         self._peak_visible: bool = False
         # Height delta added by wrapped content (peak banner and/or a footer
         # status text that wrapped to multiple lines).
@@ -376,6 +405,7 @@ class Widget:
         self._fade_job: Optional[str] = None
 
         self._last_data: Optional[UsageData] = None
+        self._last_forecast: Forecast = NO_FORECAST
         self._last_error: Optional[str] = None
         self._tooltip_win: Optional[tk.Toplevel] = None
         self._update_win: Optional[tk.Toplevel] = None
@@ -411,7 +441,7 @@ class Widget:
         if self._last_error is not None:
             root.after(0, self._apply_error, self._last_error)
         elif self._last_data is not None:
-            root.after(0, self._apply_data, self._last_data)
+            root.after(0, self._apply_data, self._last_data, self._last_forecast)
         # Evaluate peak window only after `_min_h` is captured from the natural
         # (banner-free) layout, so shrink-back at end-of-peak knows the floor.
         # Defer via after() so the initial deiconify + <Configure> + SetWindowRgn
@@ -458,43 +488,34 @@ class Widget:
                 self._save_position()
             self._post(_do)
 
-    def update(self, data: UsageData) -> None:
-        if not self._post(self._apply_data, data):
+    def update(self, data: UsageData, forecast: Forecast = NO_FORECAST) -> None:
+        if not self._post(self._apply_data, data, forecast):
             # The first poll usually finishes before start() has built the UI —
             # buffer the snapshot so start() renders it instead of "connecting…".
             self._last_data = data
+            self._last_forecast = forecast
             self._last_error = None
 
     def set_error(self, message: str) -> None:
         if not self._post(self._apply_error, message):
             self._last_error = message
 
-    def _load_logo(self, px: int) -> Optional[ImageTk.PhotoImage]:
-        """Return the app logo scaled to `px`×`px`, or None if it can't load.
-
-        A missing/corrupt asset must never block the update dialog, so any
-        failure is logged-by-omission and the caller falls back to text only.
-        """
-        try:
-            img = Image.open(_asset_path("logo.png")).convert("RGBA")
-            img = img.resize((px, px), Image.LANCZOS)
-            return ImageTk.PhotoImage(img)
-        except Exception:
-            return None
-
     def notify_update(
         self,
         latest_version: str,
         url: str,
         on_skip: Optional[Callable[[], None]] = None,
+        notes: Optional[ReleaseNotes] = None,
     ) -> None:
         """Show a dialog offering to open the GitHub release page. Thread-safe.
 
         Args:
             on_skip: Called (on the Tk thread) when the user chooses
                 "Skip version" — the dialog never reappears for this release.
+            notes: What changed since the running version; None shows a
+                "notes unavailable" line instead.
         """
-        self._post(self._show_update_dialog, latest_version, url, on_skip)
+        self._post(self._show_update_dialog, latest_version, url, on_skip, notes)
 
     def notify_message(self, title: str, body: str, kind: str = "info") -> None:
         """Show a simple modal info/warning box on the Tk thread. Thread-safe.
@@ -517,96 +538,21 @@ class Widget:
         latest_version: str,
         url: str,
         on_skip: Optional[Callable[[], None]] = None,
+        notes: Optional[ReleaseNotes] = None,
     ) -> None:
         if self._update_win is not None or not self._root:
             return
-        win = tk.Toplevel(self._root)
-        self._update_win = win
-        # Short title — the full app name lives in the (branded) body, and a long
-        # title gets clipped in the narrow window. The logo icon keeps it identifiable.
-        win.title(tr("update.window_title"))
-        win.configure(bg=_BG, padx=22, pady=18)
-        win.resizable(False, False)
-        win.attributes("-topmost", True)
+        # Imported here, not at the top: update_dialog reuses this module's
+        # design tokens, so it can only load once this module has.
+        from .update_dialog import UpdateDialog
 
-        # ── Branded header: app logo + name, so it is unmistakably *this* app
-        # that is reporting the update (the title bar alone is easy to miss).
-        header = tk.Frame(win, bg=_BG)
-        header.pack(fill="x", pady=(0, 14))
-
-        logo = self._load_logo(48)
-        if logo is not None:
-            # Hold a reference on the window so Tk doesn't garbage-collect it.
-            win._logo_ref = logo  # type: ignore[attr-defined]
-            tk.Label(header, image=logo, bg=_BG, bd=0).pack(side="left", padx=(0, 12))
-            try:
-                win.iconphoto(False, logo)  # brand the taskbar / title bar too
-            except tk.TclError:
-                pass
-
-        brand = tk.Frame(header, bg=_BG)
-        brand.pack(side="left", fill="y")
-        tk.Label(
-            brand, text="Claude Usage Tracker",
-            font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
-        ).pack(fill="x")
-        tk.Label(
-            brand, text=tr("update.available"),
-            font=_FONT_LBL, bg=_BG, fg=_OK, anchor="w",
-        ).pack(fill="x", pady=(2, 0))
-
-        # Hairline divider under the header for a finished, card-like look.
-        tk.Frame(win, bg=_BORDER, height=1).pack(fill="x", pady=(0, 14))
-
-        tk.Label(
-            win, text=tr("update.version_available", version=latest_version),
-            font=_FONT_TITLE, bg=_BG, fg=_TEXT, anchor="w",
-        ).pack(fill="x")
-        tk.Label(
-            win, text=tr("update.running_version", version=__version__),
-            font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w",
-        ).pack(fill="x", pady=(4, 14))
-
-        def _close() -> None:
+        def _closed() -> None:
             self._update_win = None
-            win.destroy()
 
-        def _open_repo() -> None:
-            webbrowser.open(url)
-            _close()
-
-        def _skip() -> None:
-            if on_skip is not None:
-                on_skip()
-            _close()
-
-        row = tk.Frame(win, bg=_BG)
-        row.pack(fill="x")
-        # side="right" packs right-to-left: Cancel ends up rightmost,
-        # matching the Windows [primary] [secondary] [cancel] button order.
-        buttons = [(tr("update.cancel"), _close)]
-        if on_skip is not None:
-            buttons.append((tr("update.skip"), _skip))
-        buttons.append((tr("update.open_github"), _open_repo))
-        for text, cmd in buttons:
-            tk.Button(
-                row, text=text, command=cmd,
-                font=_FONT_BTN, bg=_BTN_BG, fg=_TEXT,
-                activebackground=_BTN_HOV, activeforeground=_TEXT,
-                relief="flat", padx=12, pady=3, cursor="hand2",
-                bd=0, highlightthickness=0,
-            ).pack(side="right", padx=(8, 0))
-
-        win.protocol("WM_DELETE_WINDOW", _close)
-        win.bind("<Escape>", lambda e: _close())
-
-        # Size to content, then never shrink below it, so the window always
-        # matches what it contains (and the short title never gets clipped).
-        win.update_idletasks()
-        w, h = win.winfo_width(), win.winfo_height()
-        win.minsize(w, h)
-        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-        win.geometry(f"+{(sw - w) // 2}+{(sh - h) // 3}")
+        dialog = UpdateDialog(
+            self._root, latest_version, url, notes, on_skip=on_skip, on_closed=_closed
+        )
+        self._update_win = dialog.win
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -641,11 +587,12 @@ class Widget:
             card, text="", font=_FONT_LBL, bg=_BG, fg=_WARN, anchor="w",
         )
 
-        self._var_s, self._lbl_s, self._bar_s, self._session_row = self._metric_row(
-            card, tr("widget.metric.session")
+        (self._var_s, self._lbl_s, self._bar_s, self._session_row,
+         self._lbl_s_name, self._lbl_fc) = self._metric_row(
+            card, tr("widget.metric.session"), with_forecast=True
         )
         tk.Frame(card, bg=_BG, height=10).pack()
-        self._var_w, self._lbl_w, self._bar_w, _ = self._metric_row(
+        self._var_w, self._lbl_w, self._bar_w, _, _, _ = self._metric_row(
             card, tr("widget.metric.weekly")
         )
 
@@ -873,18 +820,28 @@ class Widget:
         self._root.after(60, self._reassert_geometry)
 
     def _metric_row(
-        self, parent: tk.Frame, label: str
-    ) -> tuple[tk.StringVar, tk.Label, tk.Label, tk.Frame]:
+        self, parent: tk.Frame, label: str, with_forecast: bool = False,
+    ) -> tuple[
+        tk.StringVar, tk.Label, tk.Label, tk.Frame, tk.Label, Optional[tk.Label]
+    ]:
         row = tk.Frame(parent, bg=_BG)
         row.pack(fill="x")
 
         top = tk.Frame(row, bg=_BG)
         top.pack(fill="x")
-        tk.Label(top, text=label, font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w").pack(side="left")
-
+        # The percent is packed first so it keeps its room when space is short.
         var = tk.StringVar(value="—")
         lbl = tk.Label(top, textvariable=var, font=_FONT_PCT, bg=_BG, fg=_ALERT, anchor="e")
         lbl.pack(side="right")
+        name = tk.Label(top, text=label, font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w")
+        name.pack(side="left")
+        forecast = None
+        if with_forecast:
+            forecast = tk.Label(
+                top, text="", font=_FONT_LBL, bg=_BG, fg=_DIM, anchor="w",
+                padx=0, bd=0,
+            )
+            forecast.pack(side="left")
 
         # Pillow image hosted on a Label gives us proper AA + gradients
         track = tk.Frame(row, bg=_BG, height=_BAR_H)
@@ -893,7 +850,7 @@ class Widget:
         bar = tk.Label(track, bg=_BG, bd=0, highlightthickness=0)
         bar.place(x=0, y=0, relwidth=1, relheight=1)
 
-        return var, lbl, bar, row
+        return var, lbl, bar, row, name, forecast
 
     def _build_buttons(self, foot: tk.Frame) -> None:
         frame = tk.Frame(foot, bg=_BG)
@@ -1142,6 +1099,7 @@ class Widget:
             if w is not None:
                 self._set_bar(self._bar_w, w, _pct_color(w))
         self._set_divider()
+        self._fit_forecast()
         # Re-clip the Win10 rounded region to the new size. (Win11 DWM corners
         # are size-independent so this is a no-op there.)
         _apply_round_corners(self._root)
@@ -1202,10 +1160,11 @@ class Widget:
 
     # ── State updates (always called on the Tk thread via after()) ────────────
 
-    def _apply_data(self, data: UsageData) -> None:
+    def _apply_data(self, data: UsageData, forecast: Forecast = NO_FORECAST) -> None:
         if self._var_ft is None or self._dot is None:
             return
         self._last_data = data
+        self._last_forecast = forecast
         self._last_error = None
         s = data.session_percent
         w = self._find_weekly(data)
@@ -1213,6 +1172,7 @@ class Widget:
         self._set_metric(self._var_s, self._lbl_s, self._bar_s, s)
         self._set_metric(self._var_w, self._lbl_w, self._bar_w, w)
         self._set_divider()
+        self._set_forecast(forecast)
 
         li = next((li for li in data.limits if li.key == "five_hour"), None)
         if li is None:
@@ -1237,6 +1197,7 @@ class Widget:
         self._set_metric(self._var_s, self._lbl_s, self._bar_s, None)
         self._set_metric(self._var_w, self._lbl_w, self._bar_w, None)
         self._set_divider()
+        self._set_forecast(NO_FORECAST)
         # The keyword matching runs against the raw (deliberately untranslated,
         # English) exception texts from client.py / firefox_cookies.py — only
         # the short text shown to the user is localised.
@@ -1277,6 +1238,28 @@ class Widget:
             if lbl is not None:
                 lbl.configure(fg=color)
             self._set_bar(bar, pct, color)
+
+    def _set_forecast(self, forecast: Forecast) -> None:
+        """Session forecast text after the session label (R-widget-8)."""
+        self._forecast_text, self._forecast_fg = forecast_text(forecast)
+        self._fit_forecast()
+
+    def _fit_forecast(self) -> None:
+        """Show the forecast only if it fits between the session label and
+        the percent at the current width; a cut-off forecast would misreport
+        the time, so it is hidden instead."""
+        if self._lbl_fc is None or self._lbl_s_name is None or self._lbl_s is None:
+            return
+        text = self._forecast_text
+        if text:
+            width = self._root.winfo_width() if self._root else 0
+            if width <= 1:
+                width = self._base_w
+            room = (width - 2 * _CARD_PADX
+                    - self._lbl_s_name.winfo_reqwidth() - self._lbl_s.winfo_reqwidth())
+            if tkfont.Font(root=self._root, font=_FONT_LBL).measure(text) > room:
+                text = ""
+        self._lbl_fc.configure(text=text, fg=self._forecast_fg)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

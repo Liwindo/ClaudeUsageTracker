@@ -6,6 +6,7 @@
 // and position persistence. Built entirely in code (no XAML) so the whole
 // widget lives in one file, mirroring the Python module layout.
 
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -28,22 +29,22 @@ public sealed class WidgetWindow : Window
     // ── Design tokens — identical palette to the Python widget ───────────────
     private static readonly Color BgRim = FromHex("#2c2c36");
     private static readonly Color BgSheen = FromHex("#1e1e26");
-    private static readonly Color Bg = FromHex("#16161c");
+    internal static readonly Color Bg = FromHex("#16161c");
     private static readonly Color BgBase = FromHex("#10101a");
     private static readonly Color BgShadow = FromHex("#08080d");
-    private static readonly Color TextColor = FromHex("#ececf2");
-    private static readonly Color Dim = FromHex("#9494a0");
+    internal static readonly Color TextColor = FromHex("#ececf2");
+    internal static readonly Color Dim = FromHex("#9494a0");
     private static readonly Color FootC = FromHex("#7a7a84");
     private static readonly Color BorderC = FromHex("#2e2e38");
-    private static readonly Color Track = FromHex("#1f1f27");
-    private static readonly Color BtnBg = FromHex("#26262e");
-    private static readonly Color BtnHov = FromHex("#34343e");
+    internal static readonly Color Track = FromHex("#1f1f27");
+    internal static readonly Color BtnBg = FromHex("#26262e");
+    internal static readonly Color BtnHov = FromHex("#34343e");
 
     // Status colours — identical to TrayIcon so widget and icon stay in sync.
-    private static readonly Color Ok = FromHex("#22c55e");
+    internal static readonly Color Ok = FromHex("#22c55e");
     private static readonly Color Yellow = FromHex("#eab308");
     private static readonly Color Warn = FromHex("#f97316");
-    private static readonly Color Alert = FromHex("#ef4444");
+    internal static readonly Color Alert = FromHex("#ef4444");
 
     private const double DefaultWidth = 256;
     private const double MinWidgetWidth = 200;
@@ -62,6 +63,13 @@ public sealed class WidgetWindow : Window
     private TextBlock _versionLabel = null!;
     private TextBlock _peakBanner = null!;
     private TextBlock _sessionPct = null!;
+    // Session forecast after the session label (R-widget-8): shown in full or
+    // not at all, never clipped.
+    private TextBlock _sessionName = null!;
+    private TextBlock _sessionForecast = null!;
+    private FrameworkElement _sessionLabelRow = null!;
+    private string _forecastText = "";
+    private Color _forecastColor = Dim;
     private TextBlock _weeklyPct = null!;
     private Border _sessionFill = null!;
     private Border _weeklyFill = null!;
@@ -73,6 +81,7 @@ public sealed class WidgetWindow : Window
     private StackPanel _buttonPanel = null!;
 
     private UsageData? _lastData;
+    private Forecast _lastForecast = Forecast.NoForecast;
     private string? _lastError;
     private bool _minimized;
     private Window? _updateWindow;
@@ -136,7 +145,7 @@ public sealed class WidgetWindow : Window
             if (_lastError is not null)
                 ApplyError(_lastError);
             else if (_lastData is not null)
-                ApplyData(_lastData);
+                ApplyData(_lastData, _lastForecast);
             RefreshPeakBanner();
         };
     }
@@ -157,7 +166,7 @@ public sealed class WidgetWindow : Window
         }
     }
 
-    public void UpdateData(UsageData data) => Post(() => ApplyData(data));
+    internal void UpdateData(UsageData data, Forecast forecast) => Post(() => ApplyData(data, forecast));
 
     public void SetError(string message) => Post(() => ApplyError(message));
 
@@ -189,7 +198,7 @@ public sealed class WidgetWindow : Window
 
     // ── UI construction ──────────────────────────────────────────────────────
 
-    private static Color FromHex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
+    internal static Color FromHex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
 
     // Frozen-brush caches: the palette is tiny and every setter runs once per
     // poll, so reusing frozen brushes avoids per-update allocations and lets
@@ -198,7 +207,7 @@ public sealed class WidgetWindow : Window
     private static readonly Dictionary<Color, Brush> BarGradientCache = [];
     private static readonly Dictionary<Color, Brush> GlowCache = [];
 
-    private static Brush Solid(Color color)
+    internal static Brush Solid(Color color)
     {
         if (!SolidCache.TryGetValue(color, out var brush))
         {
@@ -289,7 +298,7 @@ public sealed class WidgetWindow : Window
         card.Children.Add(_peakBanner);
 
         (var sessionRow, _sessionPct, _sessionTrack, _sessionFill) =
-            BuildMetricRow(I18n.Tr("widget.metric.session"));
+            BuildMetricRow(I18n.Tr("widget.metric.session"), withForecast: true);
         card.Children.Add(sessionRow);
         card.Children.Add(new Border { Height = 10 });
         (var weeklyRow, _weeklyPct, _weeklyTrack, _weeklyFill) =
@@ -434,7 +443,8 @@ public sealed class WidgetWindow : Window
         return new ControlTemplate(typeof(Thumb)) { VisualTree = factory };
     }
 
-    private (FrameworkElement Row, TextBlock Pct, Border Track, Border Fill) BuildMetricRow(string label)
+    private (FrameworkElement Row, TextBlock Pct, Border Track, Border Fill) BuildMetricRow(
+        string label, bool withForecast = false)
     {
         var row = new StackPanel();
 
@@ -449,14 +459,40 @@ public sealed class WidgetWindow : Window
         };
         DockPanel.SetDock(pct, Dock.Right);
         top.Children.Add(pct);
-        top.Children.Add(new TextBlock
+        var name = new TextBlock
         {
             Text = label,
             FontFamily = new FontFamily("Segoe UI"),
             FontSize = 11,
             Foreground = Solid(Dim),
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
+        if (withForecast)
+        {
+            // The label and the forecast share the room left of the percent
+            // (the DockPanel's fill slot), so the percent never gives way.
+            _sessionForecast = new TextBlock
+            {
+                FontFamily = name.FontFamily,
+                FontSize = name.FontSize,
+                Foreground = Solid(Dim),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var host = new StackPanel { Orientation = Orientation.Horizontal, ClipToBounds = true };
+            host.Children.Add(name);
+            host.Children.Add(_sessionForecast);
+            // The room is the row minus percent and label: the host itself is
+            // laid out at least as wide as its text, so it cannot tell.
+            top.SizeChanged += (_, _) => FitForecast();
+            pct.SizeChanged += (_, _) => FitForecast();
+            _sessionName = name;
+            _sessionLabelRow = top;
+            top.Children.Add(host);
+        }
+        else
+        {
+            top.Children.Add(name);
+        }
         row.Children.Add(top);
 
         var fill = new Border
@@ -692,15 +728,17 @@ public sealed class WidgetWindow : Window
 
     // ── State updates (always called on the dispatcher thread) ───────────────
 
-    private void ApplyData(UsageData data)
+    internal void ApplyData(UsageData data, Forecast forecast)
     {
         _lastData = data;
+        _lastForecast = forecast;
         _lastError = null;
         var session = data.SessionPercent;
         var weekly = FindWeekly(data);
 
         SetMetric(_sessionPct, _sessionTrack, _sessionFill, session);
         SetMetric(_weeklyPct, _weeklyTrack, _weeklyFill, weekly);
+        SetForecast(forecast);
 
         var li = data.Limits.FirstOrDefault(l => l.Key == "five_hour");
         string status;
@@ -724,11 +762,12 @@ public sealed class WidgetWindow : Window
         RefreshPeakBanner();
     }
 
-    private void ApplyError(string message)
+    internal void ApplyError(string message)
     {
         _lastError = message;
         SetMetric(_sessionPct, _sessionTrack, _sessionFill, null);
         SetMetric(_weeklyPct, _weeklyTrack, _weeklyFill, null);
+        SetForecast(Forecast.NoForecast);
 
         _footerText.Text = I18n.Tr(ClassifyErrorKey(message));
         _footerText.ToolTip = message + "\n\n" + I18n.Tr("widget.tooltip.log", ("path", AppPaths.LogFilePath));
@@ -754,6 +793,49 @@ public sealed class WidgetWindow : Window
             return "widget.error.network";
         return "widget.error.generic";
     }
+
+    /// <summary>Text (with its " · " lead-in) and colour of the session
+    /// forecast; empty text when there is nothing to show.</summary>
+    internal static (string Text, Color Color) ForecastText(Forecast forecast) => forecast.State switch
+    {
+        ForecastState.RunsOut => (" · " + I18n.Tr("widget.forecast.runs_out",
+            ("countdown", LimitInfo.FormatCountdown(forecast.Seconds))), Warn),
+        ForecastState.Lasts => (" · " + I18n.Tr("widget.forecast.lasts"), Dim),
+        _ => ("", Dim),
+    };
+
+    private void SetForecast(Forecast forecast)
+    {
+        (_forecastText, _forecastColor) = ForecastText(forecast);
+        FitForecast();
+    }
+
+    /// <summary>Show the forecast only if it fits between the session label
+    /// and the percent; a cut-off forecast would misreport the time, so it is
+    /// hidden instead. Re-run whenever that room changes (row or percent SizeChanged).</summary>
+    private void FitForecast()
+    {
+        var text = _forecastText;
+        if (text.Length > 0)
+        {
+            var room = _sessionLabelRow.ActualWidth - _sessionPct.ActualWidth - _sessionName.ActualWidth;
+            if (TextWidth(_sessionForecast, text) > room)
+                text = "";
+        }
+        _sessionForecast.Text = text;
+        _sessionForecast.Foreground = Solid(_forecastColor);
+    }
+
+    internal static double TextWidth(TextBlock style, string text) => new FormattedText(
+        text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        new Typeface(style.FontFamily, style.FontStyle, style.FontWeight, style.FontStretch),
+        style.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(style).PixelsPerDip)
+        .WidthIncludingTrailingWhitespace;
+
+    // Test accessors.
+    internal string ShownForecast => _sessionForecast.Text;
+    internal Color ShownForecastColor => ((SolidColorBrush)_sessionForecast.Foreground).Color;
+    internal static Color WarnColor => Warn;
 
     private void SetMetric(TextBlock pctLabel, Border track, Border fill, int? pct)
     {
@@ -912,185 +994,9 @@ public sealed class WidgetWindow : Window
     {
         if (_updateWindow is not null)
             return;
-        var latestVersion = info.LatestVersion;
-        var url = info.Url;
-
-        var card = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-
-        // Branded header: app logo + name, so it is unmistakably *this* app
-        // that is reporting the update.
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 14) };
-        try
-        {
-            var logo = new System.Windows.Controls.Image
-            {
-                Source = new System.Windows.Media.Imaging.BitmapImage(
-                    new Uri("pack://application:,,,/Assets/logo.png")),
-                Width = 48,
-                Height = 48,
-                Margin = new Thickness(0, 0, 12, 0),
-            };
-            header.Children.Add(logo);
-        }
-        catch (Exception)
-        {
-            // A missing/corrupt asset must never block the update dialog.
-        }
-        var brand = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        brand.Children.Add(new TextBlock
-        {
-            Text = "Claude Usage Tracker",
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 13.5,
-            FontWeight = FontWeights.Bold,
-            Foreground = Solid(TextColor),
-        });
-        brand.Children.Add(new TextBlock
-        {
-            Text = I18n.Tr("update.available"),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 11,
-            Foreground = Solid(Ok),
-            Margin = new Thickness(0, 2, 0, 0),
-        });
-        header.Children.Add(brand);
-        card.Children.Add(header);
-
-        card.Children.Add(new Border { Height = 1, Background = Solid(BorderC), Margin = new Thickness(0, 0, 0, 14) });
-
-        card.Children.Add(new TextBlock
-        {
-            Text = I18n.Tr("update.version_available", ("version", latestVersion)),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 13.5,
-            FontWeight = FontWeights.Bold,
-            Foreground = Solid(TextColor),
-        });
-        card.Children.Add(new TextBlock
-        {
-            Text = I18n.Tr("update.running_version", ("version", UpdateCheck.CurrentVersion)),
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 11,
-            Foreground = Solid(Dim),
-            Margin = new Thickness(0, 4, 0, 14),
-        });
-
-        var win = new Window
-        {
-            Title = I18n.Tr("update.window_title"),
-            Background = Solid(Bg),
-            SizeToContent = SizeToContent.WidthAndHeight,
-            ResizeMode = ResizeMode.NoResize,
-            Topmost = true,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Content = card,
-        };
-        _updateWindow = win;
-        win.Closed += (_, _) => _updateWindow = null;
-
-        void CloseDialog() => win.Close();
-
-        // Progress/error line for the in-app installer; hidden until used.
-        var statusText = new TextBlock
-        {
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 11,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = Solid(Dim),
-            Margin = new Thickness(0, 0, 0, 10),
-            Visibility = Visibility.Collapsed,
-            MaxWidth = 300,
-        };
-        card.Children.Add(statusText);
-
-        var buttonRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-        };
-        Button MakeDialogButton(string text, Action onClick)
-        {
-            var button = MakeFooterButton(text, onClick);
-            button.FontSize = 12;
-            button.Padding = new Thickness(12, 4, 12, 4);
-            button.Margin = new Thickness(8, 0, 0, 0);
-            return button;
-        }
-        void OpenGithub()
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch (Exception exc)
-            {
-                Log.Warning("widget", $"Could not open release page: {exc.Message}");
-            }
-        }
-
-        // Windows button order: [primary] [secondary] [cancel].
-#if INSTALLER_UPDATER
-        // Installed build: offer verified download-and-install. The bytes are
-        // signature- and hash-checked (UpdateInstaller) before anything runs;
-        // on success the app quits so the installer can replace it in place and
-        // the new version relaunches.
-        Button? installButton = null;
-        void StartInstall()
-        {
-            installButton!.IsEnabled = false;
-            statusText.Visibility = Visibility.Visible;
-            statusText.Text = I18n.Tr("update.downloading");
-            System.Threading.Tasks.Task.Run(() =>
-            {
-                var outcome = UpdateInstaller.Run(info, versionFloor, stage =>
-                    Post(() => statusText.Text = stage switch
-                    {
-                        UpdateStage.Downloading => I18n.Tr("update.downloading"),
-                        UpdateStage.Verifying => I18n.Tr("update.verifying"),
-                        UpdateStage.Installing => I18n.Tr("update.installing"),
-                        _ => statusText.Text,
-                    }));
-                Post(() =>
-                {
-                    if (outcome.Started)
-                    {
-                        statusText.Text = I18n.Tr("update.installing");
-                        // The visible installer wizard is now on screen; quit so
-                        // the in-use EXE unlocks. The installer relaunches the new
-                        // version from its Finish page ([Run] postinstall).
-                        _onQuit();
-                    }
-                    else
-                    {
-                        statusText.Foreground = Solid(Alert);
-                        statusText.Text = I18n.Tr("update.failed");
-                    }
-                });
-            });
-        }
-        installButton = MakeDialogButton(I18n.Tr("update.download_install"), StartInstall);
-        buttonRow.Children.Add(installButton);
-        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.open_github"), () => { OpenGithub(); CloseDialog(); }));
-#else
-        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.open_github"), () => { OpenGithub(); CloseDialog(); }));
-#endif
-        if (onSkip is not null)
-        {
-            buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.skip"), () =>
-            {
-                onSkip();
-                CloseDialog();
-            }));
-        }
-        buttonRow.Children.Add(MakeDialogButton(I18n.Tr("update.cancel"), CloseDialog));
-        card.Children.Add(buttonRow);
-
-        win.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape)
-                CloseDialog();
-        };
-        win.Show();
+        var dialog = new UpdateDialog(info, versionFloor, onSkip, _onQuit);
+        _updateWindow = dialog;
+        dialog.Closed += (_, _) => _updateWindow = null;
+        dialog.Show();
     }
 }

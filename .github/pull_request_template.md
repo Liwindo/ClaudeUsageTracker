@@ -18,5 +18,9 @@
       run and observed. The relevant `R-…` id is cited in the test name or PR.
 - [ ] **CHANGELOG.** A user-facing entry is added under `## Unreleased` (only if
       the change is user-facing).
+- [ ] **Docs.** `python scripts/check_docs.py` passes, and every line that
+      `python scripts/doc_sweep.py --base master` lists (add `--term "<feature>"`
+      for the words of the change) was read and is still true or was updated.
+      Prose describing changed behaviour counts, not just file lists.
 - [ ] Tests pass locally: `uv run pytest` (Python) and
       `dotnet test csharp/ClaudeUsageTracker.slnx` (C#).
