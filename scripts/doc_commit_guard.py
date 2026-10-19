@@ -1,7 +1,14 @@
 """Claude Code PreToolUse hook: no `git commit` without a doc review.
 
-Wired up in .claude/settings.json for the Bash and PowerShell tools. For any
-command that runs `git commit` it
+Wired up in the local, untracked .claude/settings.json for the Bash and
+PowerShell tools (Claude Code settings are not committed). The entry:
+
+    {"hooks": {"PreToolUse": [{"matcher": "Bash|PowerShell", "hooks": [{
+      "type": "command", "shell": "bash", "timeout": 60,
+      "command": "input=$(cat); printf '%s' \"$input\" | grep -Eq 'git[^\"]*commit' || exit 0; printf '%s' \"$input\" | uv run --no-project python \"$CLAUDE_PROJECT_DIR/scripts/doc_commit_guard.py\""
+    }]}]}}
+
+For any command that runs `git commit` it
 
   1. denies the commit while scripts/check_docs.py finds a gap, and
   2. denies it until the docs of the current changes were reviewed with

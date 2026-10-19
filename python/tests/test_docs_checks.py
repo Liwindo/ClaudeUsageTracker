@@ -195,9 +195,12 @@ def test_guard_fails_closed_when_the_check_breaks(monkeypatch):
     assert "could not run" in reason and "git missing" in reason
 
 
-def test_project_settings_wire_the_guard_for_bash_and_powershell():
+def test_local_settings_wire_the_guard_for_bash_and_powershell():
     import json
-    settings = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    path = ROOT / ".claude" / "settings.json"
+    if not path.exists():  # local only, not tracked (CI has none)
+        pytest.skip("no local .claude/settings.json")
+    settings = json.loads(path.read_text(encoding="utf-8"))
     entry = settings["hooks"]["PreToolUse"][0]
     assert entry["matcher"] == "Bash|PowerShell"
     assert "scripts/doc_commit_guard.py" in entry["hooks"][0]["command"]
