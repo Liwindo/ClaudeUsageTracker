@@ -101,6 +101,16 @@ variant's head will be lost again.
   `EvaluateFallsBackToCanonicalUrlForHostileReleaseUrl` (C#),
   `test_is_allowed_release_url` / `test_hostile_html_url_falls_back_to_releases_page`
   (Py).*
+- **R-net-8** — Release-note bodies (R-life-6) are **untrusted** under the same
+  compromised-GitHub model. They MUST reach the UI only as plain text with at
+  most a bold flag: never rendered as HTML or rich markup, links reduced to their
+  text and **not clickable**, control and format characters removed (BOM, bidi
+  overrides, zero-width spaces; only the emoji joiner ZWJ is kept), line endings
+  normalised, and the amount capped (10 versions, 150 blocks, 1500 code points
+  per block). The parser MUST behave identically in both variants: both suites run
+  the shared cases in `python/tests/fixtures/release_notes_cases.json`, including
+  the parse of the real GitHub releases. *Verified by: `test_release_notes.py`
+  (Py) / `ReleaseNotesTests` (C#).*
 
 ## 4. Usage-response parsing
 
@@ -147,6 +157,20 @@ variant's head will be lost again.
   *Origin: 1.2.0. Verified by: `PeakHourWindowLocal` tests.*
 - **R-widget-7** — The running version MUST be visible in the app (widget title
   row and tray menu). *Origin: 1.4.0.*
+- **R-widget-8** — The session label above the session bar MUST carry a
+  forecast: " · limit in <countdown>" (warning colour) when the pace of the last
+  30 min would reach 100 % before `resets_at`, otherwise " · lasts until reset"
+  (localized). The pace is the rise between the oldest and the newest sample of
+  that window and needs at least 10 min of samples; until then, at 100 %, once
+  the window has ended, and after a poll error nothing is shown. Samples of an
+  earlier window MUST NOT count: a `resets_at` that moves by more than 10 min (or
+  a clock that goes back) starts over. It uses only the data every poll already
+  fetches — no extra request. The forecast is shown in full or not at all,
+  never clipped and never pushing the percent aside; at the default width it
+  fits in every language. *Verified by: `forecast_cases.json` run by
+  `test_forecast.py` / `SessionForecastTests`; `test_widget_forecast.py` /
+  `WidgetForecastTests` (all languages fit, too narrow hides, error clears);
+  real run with live polls.*
 
 ## 6. Tray icon & tooltip
 
@@ -203,8 +227,10 @@ variant's head will be lost again.
   `autostart` config value on every start (a moved EXE re-registers itself).
   Only the packaged build registers itself. *Origin: 1.4.0.*
 - **R-life-3** — The update check runs **once per app start only** (never
-  periodic — explicit owner decision). If a newer GitHub release exists it offers
-  Open / Skip / Cancel; "Skip version" persists to `skip_update_version` and a
+  periodic — explicit owner decision). If a newer GitHub release exists it shows
+  what changed (R-life-6, R-life-7) and offers Open / Skip / Cancel (plus
+  Download & install in the C# installer build, §13); "Skip version" persists to
+  `skip_update_version` and a
   release newer than the skipped one shows the dialog again. *Origin: 1.3.0 / 1.4.0.*
 - **R-life-4** — The update checker compares against the latest GitHub release
   tag; a tag higher than the running version shows every user an update dialog,
@@ -217,6 +243,39 @@ variant's head will be lost again.
   `skip_update_version` so a previously-skipped release still surfaces on an
   explicit check. *Origin: this file. Verified by: `UpdateCheckTests.Evaluate*`
   (C#) / `test_update_check.py` `evaluate_release` / `check_detailed` tests (Py).*
+- **R-life-6** — The update dialog MUST show **what changed** between the running
+  version and the offered one: the release notes of every published release
+  (no drafts, no pre-releases) newer than the running version and not newer than
+  the latest, grouped by version, newest first, at most 10 versions plus a "see
+  GitHub" line for the rest. The source MUST always be the **live GitHub release
+  bodies** (`GET /releases?per_page=30` on `api.github.com`), never text bundled
+  into the app, so an edited release text on GitHub is what users see. The request
+  is made only when an update is available, on the update-check thread before the
+  dialog opens, for the startup and the manual check alike. The notes are
+  best-effort: if they cannot be loaded, the dialog MUST still open and say so,
+  and the update decision itself MUST NOT depend on them. The box grows with its
+  content up to a fixed height and then scrolls. *Verified by:
+  `test_release_notes.py` (selection + `check_detailed` with notes / failing
+  notes / no request when up to date) and `ReleaseNotesTests` (C#); dialog: real
+  app runs with a lowered version, screenshots of both variants (GUI).*
+- **R-life-7** — The update dialog MUST look and behave the same in both
+  variants (`update_dialog.py` / `UpdateDialog.cs`, shared colour values): a
+  left column with logo, app name, "Update available", the version jump
+  (running → latest), the offered versions newest first (click or Up/Down
+  selects, the selected one is highlighted) and the installed version below
+  them; the right side shows the selected version's notes with a "latest" chip
+  on the newest. If the list was truncated it ends with the "see GitHub" hint;
+  if the notes are unavailable there is no list, only the hint. "Skip version"
+  appears only where skipping is offered. The primary (green) button is "Open
+  GitHub", or "Download & install" in the C# installer build, whose progress is a
+  text line only (the installer knows its step, not a percentage). The title bar
+  MUST be dark (DWM immersive dark mode, ignored where unsupported) and its icon
+  MUST be the opaque tile logo (`logo_tile.*`): `logo.png` is translucent and
+  vanishes on a light caption. The window is resizable with a minimum size that
+  always fits the version list; its size is never stored. Only the corners
+  differ: tkinter draws them square. *Verified by: `test_update_dialog.py` (Py) /
+  `UpdateDialogTests` (C#); looks: screenshots of the real apps against the
+  design canvas (GUI).*
 
 ## 10. Privacy & security
 
@@ -253,6 +312,27 @@ variant's head will be lost again.
 - **R-rel-5** — Local and CI builds MUST run the same quality gates
   (changelog check, byte-compile/build, full test suite) so a build can't ship
   stale or untested code. *Origin: 1.4.3.*
+- **R-rel-6** — `CHANGELOG.md` MUST only use emoji that Windows 10 can draw,
+  because every section becomes a release body shown in the update dialog
+  (R-life-6), and Windows 10's emoji font draws Emoji 13+ and joined sequences
+  (ZWJ, skin tones, flags, keycaps) as boxes or loose parts.
+  `scripts/check_changelog_emoji.py` enforces an allowlist that was checked by
+  screenshot in both toolkits. It runs in CI and in the release workflow **before
+  anything is pushed**. *Verified by: `test_changelog_emoji.py`.*
+- **R-rel-7** — The tracked docs MUST name everything that exists: every Python
+  module, C# source/data file and asset in its variant's README, every script
+  and workflow in a tracked doc, every Python config key in python/README.md.
+  `scripts/check_docs.py` enforces this in both CI workflows and in the release
+  workflow before anything is pushed; CLAUDE.md is gitignored and never counts.
+  Prose about changed behaviour cannot be checked mechanically, so every change
+  MUST be reviewed with `scripts/doc_sweep.py`, which lists each doc line (with
+  context) that mentions what the change touched; the PR checklist requires it.
+  For Claude Code sessions the project hook (`.claude/settings.json` →
+  `scripts/doc_commit_guard.py`) denies `git commit` while check_docs fails or
+  until `doc_sweep.py --ack` recorded a review of exactly the current changes.
+  *Origin: docs fell behind three times in a row because they were updated
+  from memory and file lists, not swept. Verified by: `test_docs_checks.py`;
+  hook: pipe-tests of all four cases and a live blocked commit (2026-10-19).*
 
 ## 13. In-app update download & install
 
@@ -266,7 +346,7 @@ app install an attacker's build.**
 - **R-update-1** — The installer build MAY offer, from the update dialog, to
   download and install a newer release. It MUST do so only after the user
   explicitly starts it (no silent/background auto-update). *Verified by: real
-  install run (GUI/OS) — see CHANGELOG Unreleased; `UpdateVerifierTests`.*
+  install run (GUI/OS) — see CHANGELOG 2.2.0; `UpdateVerifierTests`.*
 - **R-update-2** — An update MUST be installed only if a detached signature over
   the exact `update.json` manifest bytes verifies against a **public key embedded
   in the app** (`UpdateKeys.json`), using an **offline** private key that never

@@ -38,6 +38,8 @@ STRINGS: dict[str, str] = {
     # Widget
     "widget.metric.session": "Сессия",
     "widget.metric.weekly": "Неделя",
+    "widget.forecast.lasts": "хватит до сброса",
+    "widget.forecast.runs_out": "лимит через {countdown}",
     "widget.status.connecting": "подключение…",
     "widget.status.active": "активно",
     "widget.status.reset_in": "сброс через {countdown}",
@@ -56,13 +58,17 @@ STRINGS: dict[str, str] = {
     # Update dialog
     "update.window_title": "Обновление",
     "update.available": "Доступно обновление",
-    "update.version_available": "Доступна версия {version}",
-    "update.running_version": "Установлена версия {version}.",
     "update.cancel": "Отмена",
     "update.skip": "Пропустить версию",
     "update.open_github": "Открыть GitHub",
     "update.up_to_date": "У вас последняя версия ({version}).",
     "update.check_failed": "Не удалось проверить обновления. Повторите попытку позже.",
+    "update.notes_version": "Версия {version}",
+    "update.notes_unavailable": "Не удалось загрузить описание выпуска. Оно доступно на странице выпуска на GitHub.",
+    "update.notes_more": "Более ранние изменения перечислены на GitHub.",
+    "update.versions": "Версии",
+    "update.latest": "последняя",
+    "update.installed": "установлена",
 
     # Startup dialogs
     "dialog.already_running.title": "Claude Usage Tracker",

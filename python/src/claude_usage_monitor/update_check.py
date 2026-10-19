@@ -17,11 +17,15 @@ from urllib.parse import urlparse
 import httpx
 
 from . import __version__
+from .release_notes import ReleaseNotes, select_notes
 
 logger = logging.getLogger(__name__)
 
 _REPO = "Liwindo/ClaudeUsageTracker"
 _RELEASES_API = f"https://api.github.com/repos/{_REPO}/releases/latest"
+# The release list, for the notes of every version between the running and the
+# latest one. 30 entries cover far more than the MAX_RELEASES that are shown.
+_RELEASE_LIST_API = f"https://api.github.com/repos/{_REPO}/releases?per_page=30"
 REPO_RELEASES_URL = f"https://github.com/{_REPO}/releases/latest"
 
 _TIMEOUT = httpx.Timeout(10.0)
@@ -31,6 +35,9 @@ _TIMEOUT = httpx.Timeout(10.0)
 class UpdateInfo:
     latest_version: str   # tag without leading 'v', e.g. "1.3.0"
     url: str              # release page to open in the browser
+    # What changed since the running version; None when the notes could not be
+    # loaded (the dialog then says so and points to GitHub).
+    notes: ReleaseNotes | None = None
 
 
 # Outcome of an update check, so the manual "check now" action can tell
@@ -120,31 +127,58 @@ def evaluate_release(
     return UpdateResult(STATUS_AVAILABLE, UpdateInfo(latest_version=latest, url=url))
 
 
+def _get_json(url: str) -> object:
+    """GET a GitHub API URL and return the decoded JSON. Raises on any failure,
+    including a non-200 status."""
+    resp = httpx.get(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            # GitHub's API rejects requests without a User-Agent.
+            "User-Agent": "claude-usage-monitor",
+        },
+        timeout=_TIMEOUT,
+        follow_redirects=True,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"GitHub returned {resp.status_code}")
+    return resp.json()
+
+
+def fetch_release_notes(
+    latest_version: str, current_version: str = __version__
+) -> ReleaseNotes | None:
+    """The notes of every release after the running version up to the latest,
+    read live from GitHub. Never raises: the notes are a convenience, so any
+    failure just yields None and the update dialog still opens. R-life-6."""
+    try:
+        payload = _get_json(_RELEASE_LIST_API)
+    except Exception as exc:
+        logger.info("Release notes unavailable: %s", exc)
+        return None
+    notes = select_notes(payload, current_version, latest_version)
+    if notes is None:
+        logger.info("Release notes unavailable: no usable release body.")
+    return notes
+
+
 def check_detailed(skip_version: str = "") -> UpdateResult:
     """Query GitHub and report the outcome (up-to-date / available / failed).
     Never raises. Pass skip_version="" (the default) for a manual check so a
-    previously-skipped release is still surfaced.
+    previously-skipped release is still surfaced. When an update is available,
+    its release notes are fetched as well before returning (this runs on a
+    background thread), so the dialog opens complete.
     """
     try:
-        resp = httpx.get(
-            _RELEASES_API,
-            headers={
-                "Accept": "application/vnd.github+json",
-                # GitHub's API rejects requests without a User-Agent.
-                "User-Agent": "claude-usage-monitor",
-            },
-            timeout=_TIMEOUT,
-            follow_redirects=True,
-        )
-        if resp.status_code != 200:
-            logger.info("Update check: GitHub returned %d.", resp.status_code)
-            return UpdateResult(STATUS_FAILED)
-        data = resp.json()
+        data = _get_json(_RELEASES_API)
     except Exception as exc:
         logger.info("Update check failed: %s", exc)
         return UpdateResult(STATUS_FAILED)
 
-    return evaluate_release(data, skip_version=skip_version)
+    result = evaluate_release(data, skip_version=skip_version)
+    if result.status == STATUS_AVAILABLE and result.info is not None:
+        result.info.notes = fetch_release_notes(result.info.latest_version)
+    return result
 
 
 def check_for_update(skip_version: str = "") -> UpdateInfo | None:

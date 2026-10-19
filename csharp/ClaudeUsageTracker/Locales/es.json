@@ -41,8 +41,6 @@
   "widget.tooltip.log": "Registro: {path}",
   "update.window_title": "Actualización",
   "update.available": "Actualización disponible",
-  "update.version_available": "La versión {version} está disponible",
-  "update.running_version": "Estás usando la versión {version}.",
   "update.cancel": "Cancelar",
   "update.skip": "Omitir versión",
   "update.open_github": "Abrir GitHub",
@@ -80,5 +78,13 @@
   "settings.check_updates": "Buscar actualizaciones ahora",
   "update.up_to_date": "Estás usando la última versión ({version}).",
   "update.check_failed": "No se pudo buscar actualizaciones. Inténtalo de nuevo más tarde.",
-  "tray.menu.check_updates": "Buscar actualizaciones"
+  "tray.menu.check_updates": "Buscar actualizaciones",
+  "update.notes_version": "Versión {version}",
+  "update.notes_unavailable": "No se pudieron cargar las notas de la versión. Las encontrarás en la página de la versión en GitHub.",
+  "update.notes_more": "Los cambios anteriores aparecen en GitHub.",
+  "update.versions": "Versiones",
+  "update.latest": "última",
+  "update.installed": "instalada",
+  "widget.forecast.lasts": "dura hasta el reinicio",
+  "widget.forecast.runs_out": "límite en {countdown}"
 }

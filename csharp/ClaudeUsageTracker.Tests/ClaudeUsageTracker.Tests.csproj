@@ -24,4 +24,10 @@
     <ProjectReference Include="..\ClaudeUsageTracker\ClaudeUsageTracker.csproj" />
   </ItemGroup>
 
+  <!-- Release-notes parser cases shared with the Python suite (single source). -->
+  <ItemGroup>
+    <None Include="..\..\python\tests\fixtures\release_notes_cases.json" Link="Fixtures\release_notes_cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\python\tests\fixtures\forecast_cases.json" Link="Fixtures\forecast_cases.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
