@@ -25,6 +25,7 @@ static_analysis_semgrep*/
 
 # Local AI assistant instructions (not part of the published repo)
 CLAUDE.md
+.claude/
 
 # IDE
 .vscode/
