@@ -21,9 +21,9 @@ The tracker ships in two variants that monitor the same claude.ai limits and rea
 
 | I want to… | Download |
 |------------|----------|
-| just install it and go | **`ClaudeUsageTracker-Setup-X.Y.Z.exe`** (C#, ~4 MB) — **recommended**. Per-user install (no admin rights), Start-menu entry, optional autostart, uninstaller, one-click signature-verified updates. If the .NET Desktop Runtime is missing, it opens Microsoft's official download for you. |
+| just install it and go | **`ClaudeUsageTracker-Setup-X.Y.Z.exe`** (C#, ~5 MB) — **recommended**. Per-user install (no admin rights), Start-menu entry, optional autostart, uninstaller, one-click signature-verified updates. If the .NET Desktop Runtime is missing, it opens Microsoft's official download for you. |
 | nothing installed, a single EXE | `ClaudeUsageTracker-Portable-X.Y.Z.exe` (C#, ~80 MB) — no installation, no dependencies; runs from anywhere, USB stick included. |
-| keep using the classic Python build | `ClaudeUsageTracker.exe` (Python, ~12 MB) — the proven original, portable as always. |
+| keep using the classic Python build | `ClaudeUsageTracker.exe` (Python, ~26 MB) — the proven original, portable as always. |
 
 The **C# variant** (new) additionally offers a settings dialog (no more hand-editing the config file), one-click verified updates (installer version), clickable notifications, an instant re-poll after standby/network changes, and a smaller memory footprint. The **Python variant** is the battle-tested base the project started with — it keeps working exactly as before.
 

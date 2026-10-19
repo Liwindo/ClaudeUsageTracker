@@ -75,7 +75,7 @@ One script builds everything into `dist\` (tests run as a gate first). It needs 
 
 | Artifact | Size | For whom |
 |----------|------|----------|
-| `ClaudeUsageTracker-Setup-<ver>.exe` | ~4 MB | The normal case: per-user install (no UAC), Start-menu entry, optional autostart checkbox, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link. |
+| `ClaudeUsageTracker-Setup-<ver>.exe` | ~5 MB | The normal case: per-user install (no UAC), Start-menu entry, optional autostart checkbox, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link. |
 | `ClaudeUsageTracker-Portable-<ver>.exe` | ~80 MB | Everything in one EXE (runtime included), no installation, no dependencies. Slightly higher RAM use than the installed variant (single-file bundle). |
 
 Installer details (`installer/ClaudeUsageTracker.iss`): the setup dialog speaks the same 9 languages as the app. Everywhere a user reads the name (installer, Start menu, Programs list, Task Manager display name) the app is plainly **"Claude Usage Tracker"**. Only the EXE/process name stays `ClaudeUsageTrackerCS.exe` — a deliberate technical identity kept distinct from the Python variant's `ClaudeUsageTracker.exe`, so the uninstaller's taskkill, the autostart registry value, and the process list can never hit the other variant.
