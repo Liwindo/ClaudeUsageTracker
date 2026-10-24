@@ -40,11 +40,14 @@ _SKIP_DIRS = {"__pycache__", "bin", "obj", ".venv", "node_modules", "build", "di
 
 
 def tracked_docs(root: Path = REPO_ROOT) -> list[Path]:
-    """The Markdown files that ship with the repo (CLAUDE.md is gitignored)."""
+    """The Markdown files that ship with the repo (CLAUDE.md is gitignored),
+    plus the project website (docs/*.html, GitHub Pages), which repeats README
+    facts such as features and download sizes."""
     docs = [p for p in root.glob("*.md") if p.name != "CLAUDE.md"]
     for folder in ("python", "csharp", "scripts"):
         docs += sorted((root / folder).glob("*.md"))
     docs += sorted((root / ".github").rglob("*.md"))
+    docs += sorted((root / "docs").glob("*.html"))
     return docs
 
 

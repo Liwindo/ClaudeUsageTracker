@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/github/license/Liwindo/ClaudeUsageTracker)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
 ![Languages](https://img.shields.io/badge/🌐_languages-9-2ea44f)
+[![Website](https://img.shields.io/badge/website-liwindo.github.io-f59e0b)](https://liwindo.github.io/ClaudeUsageTracker/)
 
 <p align="center">
   <img src="docs/screenshot.png" alt="Claude Usage Tracker widget showing the claude.ai session and weekly usage limits" width="300">
@@ -50,7 +51,7 @@ python/    the Python variant (source, tests, PyInstaller build)
 csharp/    the C# variant (source, tests, installer, release build)
 scripts/   shared tooling: locale sync, version bump, release signing, checks (scripts/README.md)
 .github/   CI, release and supply-chain workflows (.github/workflows/README.md), Dependabot config
-docs/      screenshots
+docs/      project website (GitHub Pages: index.html) and screenshots
 ```
 
 One version number covers both variants: releases are tagged `vX.Y.Z` and built by CI from the matching [CHANGELOG.md](CHANGELOG.md) section. Translations have a single source — the Python locale catalogs — and CI fails if the C# catalogs drift (`scripts/export_locales.py --check`).

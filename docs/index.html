@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Usage Tracker – Claude usage limits in your Windows tray</title>
+<meta name="description" content="Free Windows tray app and widget for your claude.ai and Claude Code usage limits: 5-hour session and weekly, for Free, Pro and Max. No API key.">
+<link rel="canonical" href="https://liwindo.github.io/ClaudeUsageTracker/">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<meta name="theme-color" content="#101016">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Claude Usage Tracker">
+<meta property="og:title" content="Claude Usage Tracker – your Claude usage limits in the Windows tray">
+<meta property="og:description" content="See the 5-hour session and weekly usage limits of claude.ai and Claude Code at a glance. Free, open source, no API key.">
+<meta property="og:url" content="https://liwindo.github.io/ClaudeUsageTracker/">
+<meta property="og:image" content="https://liwindo.github.io/ClaudeUsageTracker/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Claude Usage Tracker widget showing session and weekly usage">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Claude Usage Tracker",
+  "description": "Windows tray app and widget that shows your claude.ai and Claude Code usage limits: the 5-hour session limit and the weekly limit, for Claude Free, Pro and Max.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Windows 10, Windows 11",
+  "url": "https://liwindo.github.io/ClaudeUsageTracker/",
+  "downloadUrl": "https://github.com/Liwindo/ClaudeUsageTracker/releases/latest",
+  "image": "https://liwindo.github.io/ClaudeUsageTracker/screenshot.png",
+  "license": "https://github.com/Liwindo/ClaudeUsageTracker/blob/master/LICENSE",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "Liwindo", "url": "https://github.com/Liwindo" },
+  "sameAs": ["https://github.com/Liwindo/ClaudeUsageTracker"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "How can I see my Claude usage limit without opening claude.ai?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Claude Usage Tracker shows it in the Windows system tray: the icon colour reflects your 5-hour session limit, and an optional always-on-top widget shows the session and weekly percentages and when the session limit resets. It updates every 30 seconds." } },
+    { "@type": "Question", "name": "Does it show my Claude Code usage?",
+      "acceptedAnswer": { "@type": "Answer", "text": "It shows the usage limits of your Claude plan, which claude.ai and Claude Code share. Whatever you use in Claude Code counts against the same 5-hour session and weekly limits, so the tracker shows how much is left for both. It does not read Claude Code's own logs." } },
+    { "@type": "Question", "name": "Do I need an API key?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. The tracker reads your existing claude.ai login from Firefox's cookie database, read-only. You only need to be logged in to claude.ai in Firefox; Firefox does not have to be open." } },
+    { "@type": "Question", "name": "Why does it only work with Firefox?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption, which only the browser itself can decrypt. Firefox stores cookies unencrypted in SQLite, so it is the only browser that can be supported reliably." } },
+    { "@type": "Question", "name": "Which data leaves my computer?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Only HTTPS requests to claude.ai, the same ones your browser already makes, and an anonymous version check to api.github.com once per app start (plus the release notes when a newer version exists), which can be turned off. No cookies or usage data leave your computer, and there is no telemetry." } },
+    { "@type": "Question", "name": "Is this an official Anthropic tool?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. It is an independent open-source project, not affiliated with or endorsed by Anthropic. It uses internal, undocumented claude.ai endpoints and may break without notice." } }
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #101016;
+  --surface: #16161c;
+  --surface-2: #1c1c24;
+  --border: #2a2a34;
+  --text: #ececf2;
+  --dim: #a2a2ae;
+  --accent: #f59e0b;
+  --accent-ink: #1a1203;
+  --green: #22c55e;
+  --radius: 14px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--accent); }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+header.top { border-bottom: 1px solid var(--border); }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 600; }
+.brand img { width: 36px; height: 36px; border-radius: 8px; }
+.top nav a { color: var(--dim); text-decoration: none; margin-left: 18px; font-size: 15px; }
+.top nav a:hover { color: var(--text); }
+
+.hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 48px; align-items: center; padding-top: 64px; padding-bottom: 56px; }
+.hero h1 { font-size: clamp(32px, 5vw, 50px); line-height: 1.12; margin: 0 0 18px; letter-spacing: -0.02em; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.lead { color: var(--dim); font-size: 19px; margin: 0 0 28px; max-width: 34em; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface-2); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:hover { filter: brightness(1.08); }
+.meta { color: var(--dim); font-size: 14px; margin: 0; }
+.shot { display: flex; justify-content: center; }
+.shot img { width: 100%; max-width: 384px; height: auto; image-rendering: auto; filter: drop-shadow(0 18px 40px rgba(0,0,0,.55)); }
+
+section { padding: 56px 0; border-top: 1px solid var(--border); }
+section h2 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
+section .sub { color: var(--dim); margin: 0 0 28px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.card h3 { font-size: 17px; margin: 0 0 6px; }
+.card p { margin: 0; color: var(--dim); font-size: 15.5px; }
+
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+ol.steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; color: var(--dim); font-size: 15.5px; }
+ol.steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent); font-weight: 700; margin-bottom: 10px; }
+ol.steps strong { display: block; color: var(--text); margin-bottom: 4px; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 15.5px; }
+.table th, .table td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.table th { color: var(--dim); font-weight: 600; font-size: 14px; }
+.table code { font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 14px; color: var(--text); word-break: break-all; }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; color: var(--green); border: 1px solid #1f5133; background: #12251a; border-radius: 6px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+
+details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 20px; margin-bottom: 10px; }
+summary { cursor: pointer; padding: 16px 0; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; float: right; color: var(--dim); }
+details[open] summary::after { content: "–"; }
+details p { margin: 0 0 16px; color: var(--dim); font-size: 15.5px; }
+
+footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--dim); font-size: 14px; }
+footer p { margin: 0 0 6px; }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 32px; padding-top: 40px; padding-bottom: 40px; }
+  .shot { order: -1; }
+  .shot img { max-width: 300px; }
+  .grid, ol.steps { grid-template-columns: 1fr; }
+  .top nav a:not(.gh) { display: none; }
+  /* The download table becomes one card per download. */
+  .table thead { display: none; }
+  .table tr { display: block; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .table td { display: block; border: 0; padding: 2px 0; }
+  .table td:nth-child(2) { color: var(--dim); font-size: 14px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.png" alt="" width="36" height="36">Claude Usage Tracker</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="#faq">FAQ</a>
+      <a class="gh" href="https://github.com/Liwindo/ClaudeUsageTracker">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>Your Claude usage limits, <em>always in view</em></h1>
+      <p class="lead">A free Windows tray app and widget that shows how much of your claude.ai and Claude Code usage limits is left: the 5-hour session and the weekly limit, for Claude Free, Pro and Max. No API key, nothing to set up.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/Liwindo/ClaudeUsageTracker/releases/latest">Download for Windows</a>
+        <a class="btn" href="https://github.com/Liwindo/ClaudeUsageTracker">View on GitHub</a>
+      </div>
+      <p class="meta">Windows 10 and 11 · needs Firefox · MIT licence · 9 languages</p>
+    </div>
+    <div class="shot">
+      <img src="screenshot.png" width="256" height="186" alt="Claude Usage Tracker widget showing 56 % session usage with the forecast “limit in 48m”, 23 % weekly usage and a reset countdown">
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>What it shows</h2>
+      <p class="sub">The same numbers as claude.ai's usage page, without opening it or interrupting a conversation.</p>
+      <div class="grid">
+        <div class="card"><h3>Session and weekly limits</h3><p>Your 5-hour session usage and your weekly usage in percent, refreshed every 30 seconds in the background.</p></div>
+        <div class="card"><h3>Will the session last?</h3><p>From your pace over the last 30 minutes, the widget tells you whether the session limit lasts until it resets, or when you would hit it.</p></div>
+        <div class="card"><h3>Reset countdown</h3><p>How long until the session limit resets, with a colour dot that shows how soon the refresh comes.</p></div>
+        <div class="card"><h3>Colour-coded tray icon</h3><p>Green, yellow, orange, red: the tray icon shows your session usage even when the widget is hidden.</p></div>
+        <div class="card"><h3>Notifications</h3><p>A desktop notification when a limit reaches 80 % and 95 % (configurable), and another one once it has reset.</p></div>
+        <div class="card"><h3>Private by design</h3><p>Reads your Firefox login read-only, talks only to claude.ai and GitHub's update check, and sends no telemetry.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">The tracker uses the claude.ai login you already have in Firefox.</p>
+      <ol class="steps">
+        <li><strong>Log in to claude.ai in Firefox</strong>Once is enough. Firefox does not need to stay open.</li>
+        <li><strong>Install and start the tracker</strong>It sits in the system tray. Left-click the icon to show or hide the widget.</li>
+        <li><strong>Keep an eye on your limits</strong>The icon and widget update on their own; drag the widget anywhere and resize it.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p class="sub">Every <a href="https://github.com/Liwindo/ClaudeUsageTracker/releases/latest">release on GitHub</a> contains three downloads and a <code>SHA256SUMS.txt</code> with their checksums.</p>
+      <table class="table">
+        <thead><tr><th>Download</th><th>Size</th><th>For whom</th></tr></thead>
+        <tbody>
+          <tr><td><code>ClaudeUsageTracker-Setup-X.Y.Z.exe</code><span class="tag">recommended</span></td><td>~5 MB</td><td>Per-user install without admin rights, Start-menu entry, optional autostart, one-click signature-verified updates. Opens Microsoft's download if the .NET Desktop Runtime is missing.</td></tr>
+          <tr><td><code>ClaudeUsageTracker-Portable-X.Y.Z.exe</code></td><td>~80 MB</td><td>A single EXE with no installation and no dependencies; runs from anywhere, USB stick included.</td></tr>
+          <tr><td><code>ClaudeUsageTracker.exe</code></td><td>~26 MB</td><td>The original Python build, portable as well.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <p class="sub">Short answers to what people ask most.</p>
+      <details><summary>How can I see my Claude usage limit without opening claude.ai?</summary><p>Claude Usage Tracker shows it in the Windows system tray: the icon colour reflects your 5-hour session limit, and an optional always-on-top widget shows the session and weekly percentages and when the session limit resets. It updates every 30 seconds.</p></details>
+      <details><summary>Does it show my Claude Code usage?</summary><p>It shows the usage limits of your Claude plan, which claude.ai and Claude Code share. Whatever you use in Claude Code counts against the same 5-hour session and weekly limits, so the tracker shows how much is left for both. It does not read Claude Code's own logs.</p></details>
+      <details><summary>Do I need an API key?</summary><p>No. The tracker reads your existing claude.ai login from Firefox's cookie database, read-only. You only need to be logged in to claude.ai in Firefox; Firefox does not have to be open.</p></details>
+      <details><summary>Why does it only work with Firefox?</summary><p>Since Chrome 127, Chromium browsers encrypt cookies with App-Bound Encryption, which only the browser itself can decrypt. Firefox stores cookies unencrypted in SQLite, so it is the only browser that can be supported reliably.</p></details>
+      <details><summary>Which data leaves my computer?</summary><p>Only HTTPS requests to claude.ai, the same ones your browser already makes, and an anonymous version check to api.github.com once per app start (plus the release notes when a newer version exists), which can be turned off. No cookies or usage data leave your computer, and there is no telemetry.</p></details>
+      <details><summary>Is this an official Anthropic tool?</summary><p>No. It is an independent open-source project, not affiliated with or endorsed by Anthropic. It uses internal, undocumented claude.ai endpoints and may break without notice.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Claude Usage Tracker is free software under the <a href="https://github.com/Liwindo/ClaudeUsageTracker/blob/master/LICENSE">MIT licence</a>. Source code, issues and release notes on <a href="https://github.com/Liwindo/ClaudeUsageTracker">GitHub</a>.</p>
+    <p>Not affiliated with or endorsed by Anthropic. “Claude” is a trademark of Anthropic, PBC.</p>
+  </div>
+</footer>
+</body>
+</html>

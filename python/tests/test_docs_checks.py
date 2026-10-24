@@ -73,6 +73,18 @@ def test_each_kind_of_gap_is_reported(tmp_path):
         assert missing in problems, missing
 
 
+def test_website_is_a_tracked_doc(tmp_path):
+    """docs/index.html (GitHub Pages) repeats README facts such as download
+    sizes and features, so the sweep must show its lines too."""
+    root = _fake_repo(tmp_path)
+    (root / "docs").mkdir()
+    (root / "docs" / "index.html").write_text("<p>~5 MB</p>\n", encoding="utf-8")
+    (root / "docs" / "screenshot.png").write_bytes(b"")
+    docs = [p.relative_to(root).as_posix() for p in cd.tracked_docs(root)]
+    assert "docs/index.html" in docs
+    assert "docs/screenshot.png" not in docs
+
+
 def test_claude_md_does_not_count_as_documentation(tmp_path):
     """CLAUDE.md is gitignored: naming something only there documents nothing."""
     root = _fake_repo(tmp_path)
