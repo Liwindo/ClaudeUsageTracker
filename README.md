@@ -8,10 +8,10 @@
 ![Languages](https://img.shields.io/badge/🌐_languages-9-2ea44f)
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Floating widget" width="300">
+  <img src="docs/screenshot.png" alt="Claude Usage Tracker widget showing the claude.ai session and weekly usage limits" width="300">
 </p>
 
-A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left. The interface is available in 9 languages and follows your Windows display language automatically.
+A lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. These are the same limits your [Claude Code](https://claude.com/product/claude-code) usage counts against, so the tracker shows how much is left for both. A colour-coded tray icon and an optional floating widget update automatically in the background, so you never have to open the usage page or interrupt a conversation to see how much of your limit is left. The interface is available in 9 languages and follows your Windows display language automatically.
 
 > **Disclaimer:** This tool uses internal, undocumented claude.ai API endpoints. It may break without notice. This project is not affiliated with or endorsed by Anthropic.
 
@@ -25,7 +25,7 @@ The tracker ships in two variants that monitor the same claude.ai limits and rea
 | nothing installed, a single EXE | `ClaudeUsageTracker-Portable-X.Y.Z.exe` (C#, ~80 MB) — no installation, no dependencies; runs from anywhere, USB stick included. |
 | keep using the classic Python build | `ClaudeUsageTracker.exe` (Python, ~26 MB) — the proven original, portable as always. |
 
-The **C# variant** (new) additionally offers a settings dialog (no more hand-editing the config file), one-click verified updates (installer version), clickable notifications, an instant re-poll after standby/network changes, and a smaller memory footprint. The **Python variant** is the battle-tested base the project started with — it keeps working exactly as before.
+The **C# variant** additionally offers a settings dialog (no more hand-editing the config file), one-click verified updates (installer version), clickable notifications, an instant re-poll after standby/network changes, and a smaller memory footprint. The **Python variant** is the battle-tested base the project started with — it keeps working exactly as before.
 
 Both variants use separate config folders, so they can run side by side while you compare (that doubles the requests to claude.ai — harmless, but pick one for daily use). Settings use the same TOML format in both; to migrate, copy your values over once — or just set them again in the C# settings dialog.
 

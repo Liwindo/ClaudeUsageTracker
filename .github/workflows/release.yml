@@ -320,6 +320,9 @@ jobs:
           # Explicit: on a workflow_dispatch run github.ref is the branch, not
           # the tag the release belongs to.
           tag_name: ${{ needs.prepare.outputs.tag }}
+          # Full product name in the title: release pages are indexed by search
+          # engines under this title. The apps read only tag_name, never the title.
+          name: Claude Usage Tracker ${{ needs.prepare.outputs.version }}
           files: |
             assets/python-exe/ClaudeUsageTracker.exe
             assets/csharp-exes/ClaudeUsageTracker-*.exe

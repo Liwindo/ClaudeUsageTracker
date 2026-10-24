@@ -3,10 +3,10 @@
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 
 <p align="center">
-  <img src="../docs/screenshot.png" alt="Floating widget" width="300">
+  <img src="../docs/screenshot.png" alt="Claude Usage Tracker widget showing the claude.ai session and weekly usage limits" width="300">
 </p>
 
-The original Python/tkinter build of the tracker: a lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. A colour-coded tray icon and an optional floating widget update automatically in the background. The interface is available in 9 languages and follows your Windows display language automatically.
+The original Python/tkinter build of the tracker: a lightweight Windows system-tray app that tracks your [claude.ai](https://claude.ai) **usage limits** — your **session (5-hour)** and **weekly** rate limits, for Claude Free, Pro, and Max plans — at a glance. These are the same limits your [Claude Code](https://claude.com/product/claude-code) usage counts against, so the tracker shows how much is left for both. A colour-coded tray icon and an optional floating widget update automatically in the background. The interface is available in 9 languages and follows your Windows display language automatically.
 
 Not sure which variant you want? See ["Which version is for me?"](../README.md#which-version-is-for-me) in the repository README.
 
