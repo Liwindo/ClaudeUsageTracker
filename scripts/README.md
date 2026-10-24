@@ -3,7 +3,7 @@
 Shared tooling for both variants. Each script's docstring or header has the details.
 
 | Script | Purpose |
-|--------|---------|
+| --- | --- |
 | `export_locales.py` | Syncs the C# locale catalogs from the Python source; CI runs `--check` |
 | `bump_version.ps1` | Sets the version of both variants in lockstep (run by `release.yml`) |
 | `check_changelog.ps1` | Local build guard: the current version has a CHANGELOG section |

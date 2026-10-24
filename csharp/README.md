@@ -19,7 +19,7 @@ Configuration lives in `%APPDATA%\claude-usage-tracker-cs\config.toml` — same 
 
 ## Project structure
 
-```
+```text
 ClaudeUsageTracker/        WPF app (net10.0-windows, UI entirely in code — no XAML)
 ├─ Program.cs              Entry point: mutex, config, i18n, logging, autostart, EcoQoS
 ├─ AppOrchestrator.cs      Wires poller, widget, tray, notifications, update check, triggers
@@ -74,7 +74,7 @@ One script builds everything into `dist\` (tests run as a gate first). It needs 
 ```
 
 | Artifact | Size | For whom |
-|----------|------|----------|
+| --- | --- | --- |
 | `ClaudeUsageTracker-Setup-<ver>.exe` | ~5 MB | The normal case: per-user install (no UAC), Start-menu entry, optional autostart checkbox, uninstaller. Detects a missing .NET 10 Desktop Runtime and offers to download it from the official Microsoft link. |
 | `ClaudeUsageTracker-Portable-<ver>.exe` | ~80 MB | Everything in one EXE (runtime included), no installation, no dependencies. Slightly higher RAM use than the installed variant (single-file bundle). |
 

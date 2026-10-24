@@ -1,7 +1,7 @@
 # Workflows
 
 | Workflow | Purpose |
-|----------|---------|
+| --- | --- |
 | `ci.yml` | Python variant: lock check, dependency validation, locale, emoji and docs checks, tests; Dependabot automerge |
 | `ci-csharp.yml` | C# variant: xunit tests, locale and docs checks; Dependabot automerge |
 | `release.yml` | Version bump, CHANGELOG stamp, tag, tests, builds of both variants, draft release |
