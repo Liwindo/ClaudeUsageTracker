@@ -7,6 +7,12 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+### 🔒 Security / hardening
+
+- **The Python version now ships the image library Pillow 13.0.0 (was 12.3.0).** GitHub reported nine security advisories for 12.3.0 (one critical, six high), all fixed in 13.0.0. Each was checked against what the app does, and no way was found to trigger any of them through it: they concern reading JPEG, TIFF, GIF, EPS and PDF files and one image filter, while the app only draws its own icons and opens a single image, the logo built into the app. The library is updated anyway, so the app's safety no longer rests on that analysis. The C# version does not use Pillow.
+
 ## 2.3.0 — 2026-10-19
 
 ### ✨ New features
