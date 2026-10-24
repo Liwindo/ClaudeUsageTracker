@@ -20,7 +20,7 @@ A lightweight Windows system-tray app that tracks your [claude.ai](https://claud
 The tracker ships in two variants that monitor the same claude.ai limits and read the same Firefox cookies. Every [release](../../releases/latest) contains all three downloads plus a `SHA256SUMS.txt` with their checksums:
 
 | I want to… | Download |
-|------------|----------|
+| --- | --- |
 | just install it and go | **`ClaudeUsageTracker-Setup-X.Y.Z.exe`** (C#, ~5 MB) — **recommended**. Per-user install (no admin rights), Start-menu entry, optional autostart, uninstaller, one-click signature-verified updates. If the .NET Desktop Runtime is missing, it opens Microsoft's official download for you. |
 | nothing installed, a single EXE | `ClaudeUsageTracker-Portable-X.Y.Z.exe` (C#, ~80 MB) — no installation, no dependencies; runs from anywhere, USB stick included. |
 | keep using the classic Python build | `ClaudeUsageTracker.exe` (Python, ~26 MB) — the proven original, portable as always. |
@@ -45,7 +45,7 @@ The tool reads your existing claude.ai session cookies directly from Firefox's c
 
 ## Repository layout
 
-```
+```text
 python/    the Python variant (source, tests, PyInstaller build)
 csharp/    the C# variant (source, tests, installer, release build)
 scripts/   shared tooling: locale sync, version bump, release signing, checks (scripts/README.md)

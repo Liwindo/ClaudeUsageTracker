@@ -12,6 +12,7 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
+
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
@@ -24,9 +25,10 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser & Version [eg. Firefox 150.0.3]
- - Cloud Usage Tracker Version [e.g. 1.2]
+
+- OS: [e.g. Windows 11 24H2]
+- Firefox version: [e.g. 150.0.3]
+- Claude Usage Tracker version and variant: [e.g. 2.3.1, C# installer / C# portable / Python]
 
 **Additional context**
 Add any other context about the problem here.

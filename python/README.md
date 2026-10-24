@@ -14,12 +14,12 @@ Not sure which variant you want? See ["Which version is for me?"](../README.md#w
 
 ## Quick start
 
-**Option A — Download the EXE (no Python required)**
+### Option A — Download the EXE (no Python required)
 
 1. Download `ClaudeUsageTracker.exe` from the [latest release](https://github.com/Liwindo/ClaudeUsageTracker/releases/latest)
 2. Double-click it — it starts in the system tray
 
-**Option B — Build from source**
+### Option B — Build from source
 
 Install [uv](https://docs.astral.sh/uv/), clone the repo, and run `build_exe.bat` in this `python/` directory. The script handles everything; the EXE ends up in `python\dist\ClaudeUsageTracker.exe`.
 
@@ -42,12 +42,12 @@ Once per app start it also asks the GitHub API whether a newer release exists; i
 The tray circle reflects your current **session (5-hour)** limit; the widget's progress bars use the same scale:
 
 | Colour | Session usage |
-|--------|--------------|
-| 🟢 Green  | Below 40%   |
-| 🟡 Yellow | 40–59%      |
-| 🟠 Orange | 60–84%      |
-| 🔴 Red    | 85%+        |
-| ⚫ Grey   | No data / error |
+| --- | --- |
+| 🟢 Green | Below 40% |
+| 🟡 Yellow | 40–59% |
+| 🟠 Orange | 60–84% |
+| 🔴 Red | 85%+ |
+| ⚫ Grey | No data / error |
 
 Left-click the tray icon to show or hide the widget; right-click for **Refresh now**, **Check for updates**, **Release notes**, **View log file**, **Open app data folder**, and **Quit**.
 
@@ -57,7 +57,7 @@ The always-on-top widget shows **session %** with a forecast behind the label (*
 
 The config file is created automatically on first run at:
 
-```
+```text
 %APPDATA%\claude-usage-monitor\config.toml
 ```
 
@@ -123,7 +123,7 @@ CI runs the tests on every push and pull request. Releases are made by CI (the `
 ## Troubleshooting
 
 | Symptom | Fix |
-| ------- | --- |
+| --- | --- |
 | Grey icon / "No claude.ai cookies found" | Log in to [claude.ai](https://claude.ai) in Firefox, then right-click the tray icon → **Refresh now**. |
 | "Session expired" or 403 after a while | The Cloudflare `cf_clearance` cookie is stale. Open claude.ai in Firefox, navigate briefly, then **Refresh now**. |
 | "Firefox profiles.ini not found" | Launch Firefox once and log in to claude.ai, then restart this tool. |
@@ -136,7 +136,7 @@ CI runs the tests on every push and pull request. Releases are made by CI (the `
 
 ## Project structure
 
-```
+```text
 src/claude_usage_monitor/
 ├── __main__.py          Entry point
 ├── app.py               Orchestration (threads, callbacks)

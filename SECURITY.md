@@ -3,7 +3,7 @@
 ## Supported versions
 
 | Version | Security updates |
-|---------|-----------------|
+| --- | --- |
 | 2.x (latest) | ✅ Yes |
 | < 2.0 | ❌ No |
 
@@ -58,7 +58,7 @@ A useful report contains:
 ## Response timeline
 
 | Step | Target |
-|------|--------|
+| --- | --- |
 | Acknowledgement | Within 72 hours |
 | Initial assessment | Within 7 days |
 | Fix or mitigation | Within 30 days for high/critical issues |

@@ -1,0 +1,12 @@
+// markdownlint settings for the repo's Markdown (read by the VS Code
+// markdownlint extension and markdownlint-cli2).
+{
+  // Prose is written one paragraph per line; GitHub wraps it.
+  "MD013": false,
+  // The READMEs centre the screenshot with <p align="center"><img …>.
+  "MD033": { "allowed_elements": ["p", "img"] },
+  // CHANGELOG repeats "### Bug fixes" etc. under each release heading.
+  "MD024": { "siblings_only": true },
+  // The PR template starts with a comment and a "##" section on purpose.
+  "MD041": false
+}

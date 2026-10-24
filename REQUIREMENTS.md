@@ -158,8 +158,8 @@ variant's head will be lost again.
 - **R-widget-7** — The running version MUST be visible in the app (widget title
   row and tray menu). *Origin: 1.4.0.*
 - **R-widget-8** — The session label above the session bar MUST carry a
-  forecast: " · limit in <countdown>" (warning colour) when the pace of the last
-  30 min would reach 100 % before `resets_at`, otherwise " · lasts until reset"
+  forecast: `" · limit in <countdown>"` (warning colour) when the pace of the last
+  30 min would reach 100 % before `resets_at`, otherwise `" · lasts until reset"`
   (localized). The pace is the rise between the oldest and the newest sample of
   that window and needs at least 10 min of samples; until then, at 100 %, once
   the window has ended, and after a poll error nothing is shown. Samples of an
