@@ -342,12 +342,16 @@ variant's head will be lost again.
   Prose about changed behaviour cannot be checked mechanically, so every change
   MUST be reviewed with `scripts/doc_sweep.py`, which lists each doc line (with
   context) that mentions what the change touched; the PR checklist requires it.
+  The project website `docs/index.html` (GitHub Pages) repeats README facts
+  (features, download sizes, privacy, FAQ), so it is a tracked doc too and the
+  sweep lists its lines.
   For Claude Code sessions a local hook (`.claude/settings.json`, not tracked;
   its entry is in the docstring of `scripts/doc_commit_guard.py`) denies
   `git commit` while check_docs fails or until `doc_sweep.py --ack` recorded a
   review of exactly the current changes.
   *Origin: docs fell behind three times in a row because they were updated
-  from memory and file lists, not swept. Verified by: `test_docs_checks.py`;
+  from memory and file lists, not swept. Verified by: `test_docs_checks.py`
+  (incl. `test_website_is_a_tracked_doc`);
   hook: pipe-tests of all four cases and a live blocked commit (2026-10-19).*
 
 ## 13. In-app update download & install
