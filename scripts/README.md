@@ -8,6 +8,7 @@ Shared tooling for both variants. Each script's docstring or header has the deta
 | `bump_version.ps1` | Sets the version of both variants in lockstep (run by `release.yml`) |
 | `check_changelog.ps1` | Local build guard: the current version has a CHANGELOG section |
 | `check_changelog_emoji.py` | CHANGELOG emoji must render on Windows 10 (they end up in the update dialog) |
+| `check_bundled_runtime.py` | The portable C# EXE bundles the latest .NET runtime (run by `release.yml`) |
 | `check_docs.py` | Docs name every module, file, asset, script, workflow and config key (CI) |
 | `doc_sweep.py` | Lists every doc line a change touches, for review; `--ack` records the review |
 | `doc_commit_guard.py` | Claude Code hook: no commit before `check_docs.py` passes and the sweep is acknowledged |

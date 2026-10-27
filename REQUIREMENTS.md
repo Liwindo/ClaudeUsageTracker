@@ -353,6 +353,16 @@ variant's head will be lost again.
   from memory and file lists, not swept. Verified by: `test_docs_checks.py`
   (incl. `test_website_is_a_tracked_doc`);
   hook: pipe-tests of all four cases and a live blocked commit (2026-10-19).*
+- **R-rel-8** — *variant-specific (C# portable build):* The portable EXE carries
+  its own .NET runtime, which nothing updates on the user's PC. The release
+  workflow MUST fail before the draft is created unless both runtimes in it
+  (`Microsoft.NETCore.App`, `Microsoft.WindowsDesktop.App`) are the latest
+  runtime of their channel in Microsoft's release metadata
+  (`scripts/check_bundled_runtime.py`, fails closed when the metadata is
+  unreachable). *Origin: 2.2.4 shipped 10.0.10 while 10.0.13 was current, and
+  .NET 10.0.14 was released right before 2.3.2. Verified by:
+  `test_bundled_runtime.py`; the script fails on the real 2.3.1 portable EXE
+  (10.0.13 vs. 10.0.14).*
 
 ## 13. In-app update download & install
 

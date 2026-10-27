@@ -7,6 +7,17 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.
+
+### 🔒 Security / hardening
+
+- **The Python version no longer trusts the certificate authorities of eMudhra (emSign).** After a security incident at that certificate authority, its root certificates were removed from certifi, the list of trusted certificate authorities the Python version uses for its HTTPS connections. The app now ships certifi 2026.10.19 (was 2026.4.22). The C# version uses the Windows certificate store and is not affected.
+- **The Python version is now built with Python 3.14.10 (was 3.14.8).** This security release distrusts the compromised eMudhra intermediate certificates in the `ssl` module and fixes issues in `tarfile` and `http.cookiejar`. Before the switch, a real request confirmed that claude.ai still accepts connections made with the new version (see 1.5.1 for why this is checked).
+- **The portable C# version now ships the current .NET runtime (10.0.14, was 10.0.13).** It contains Microsoft's security fixes of 25 October 2026. From now on a release is only built if its portable EXE contains the latest .NET runtime Microsoft has released. The installer version uses the .NET Desktop Runtime installed on your PC instead; keep that up to date through Windows Update or [Microsoft's download page](https://dotnet.microsoft.com/download/dotnet/10.0).
+- **Updated bundled libraries.** C# version: Microsoft.Data.Sqlite and System.Net.Http.WinHttpHandler 10.0.14. Python version: the build tool setuptools 84.1.0.
+
 ## 2.3.1 — 2026-10-24
 
 ### 🔒 Security / hardening
