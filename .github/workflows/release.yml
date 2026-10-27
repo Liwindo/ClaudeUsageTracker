@@ -288,6 +288,15 @@ jobs:
             }
           }
 
+      # The portable EXE carries its own .NET runtime, which users never get
+      # updated otherwise. Fails if it is not the latest runtime Microsoft has
+      # released for the channel (R-rel-8); re-run the job once the SDK has it.
+      - name: Verify the portable EXE bundles the latest .NET runtime
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: python scripts/check_bundled_runtime.py "csharp/dist/ClaudeUsageTracker-Portable-$env:VERSION.exe"
+
       - uses: actions/upload-artifact@v7
         with:
           name: csharp-exes

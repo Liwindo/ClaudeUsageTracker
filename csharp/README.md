@@ -144,6 +144,10 @@ it), a forgotten signing step can never ship an unsigned update — the release 
 stays a draft. The `release-integrity` workflow re-verifies every published
 release as a safety net. `gh workflow run release.yml -f version=X.Y.Z -f dry_run=true`
 rehearses the bump/CHANGELOG/tag step without pushing or building anything.
+The workflow also fails before the draft is created when the portable EXE does
+not bundle the latest .NET runtime that Microsoft has released
+(`scripts/check_bundled_runtime.py`); if the runner's SDK does not have it yet, re-run
+the failed job later.
 
 ## License
 
