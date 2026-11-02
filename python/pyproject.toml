@@ -15,7 +15,7 @@ dependencies = [
     "Pillow>=13.0.0",
     "plyer>=2.1",
     "tomli-w>=1.2.0",
-    "tzdata>=2026.5",
+    "tzdata>=2026.6",
 ]
 
 [project.scripts]
@@ -24,7 +24,7 @@ claude-usage-monitor = "claude_usage_monitor.__main__:main"
 [project.optional-dependencies]
 dev = [
     "pyinstaller>=6.22.3",
-    "pytest>=9.1.1",
+    "pytest>=9.2.0",
 ]
 
 [tool.hatch.version]
