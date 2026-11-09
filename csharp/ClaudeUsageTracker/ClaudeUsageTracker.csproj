@@ -72,7 +72,7 @@
     <!-- Pin the native SQLite bundle above the vulnerable 2.1.x that
          Microsoft.Data.Sqlite 9.0.0 references transitively (GHSA-2m69-gcr7-jv3q). -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
-    <PackageReference Include="Tomlyn" Version="2.10.1" />
+    <PackageReference Include="Tomlyn" Version="2.11.1" />
   </ItemGroup>
 
   <ItemGroup>
