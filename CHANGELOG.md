@@ -7,6 +7,15 @@ This file records *what changed for users*. The behavioural contract both varian
 must satisfy — the invariants a fix establishes — lives in
 [REQUIREMENTS.md](REQUIREMENTS.md); update it alongside any behavioural change.
 
+## Unreleased
+
+A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.
+
+### 🔒 Security / hardening
+
+- **The portable C# version now ships the current .NET runtime (10.0.15, was 10.0.14).** It contains Microsoft's security fixes of 10 November 2026; GitHub rates five of them, which affect the runtime bundled in 2.3.2, as high (remote code execution). The installer version uses the .NET Desktop Runtime installed on your PC instead; keep that up to date through Windows Update or [Microsoft's download page](https://dotnet.microsoft.com/download/dotnet/10.0).
+- **Updated bundled libraries.** C# version: Microsoft.Data.Sqlite and System.Net.Http.WinHttpHandler 10.0.15, Tomlyn 2.11.1. Python version: the time zone data tzdata 2026.6.
+
 ## 2.3.2 — 2026-10-27
 
 A maintenance release: no new features and no change in behaviour, only updated components with their security fixes.
